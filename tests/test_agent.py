@@ -32,6 +32,35 @@ def test_pending_sources_are_excluded_from_automatic_batches(
     assert jobs == []
 
 
+def test_campaign_stays_open_while_a_manual_job_is_queued(
+    database: Database, repository: Repository, tmp_path: Path
+) -> None:
+    channel = repository.create_channel("alice", "https://www.youtube.com/@alice/videos")
+    job = repository.enqueue("alice", "initialize_channel", "channel", int(channel["id"]), manual=True)
+    campaign = repository.ensure_campaign("alice")
+    agent = make_agent(database, repository, tmp_path)
+
+    for _ in range(3):
+        agent._prepare_automatic_jobs("alice", repository.ensure_campaign("alice"))
+
+    campaigns = database.all("SELECT * FROM campaigns WHERE user_id='alice'")
+    assert [(item["id"], item["status"]) for item in campaigns] == [(campaign["id"], "running")]
+    assert repository.ensure_campaign("alice")["next_lot_at"] == campaign["next_lot_at"]
+    assert repository.job("alice", job["id"])["campaign_id"] == campaign["id"]
+
+
+def test_campaign_finishes_when_nothing_is_left_to_do(
+    database: Database, repository: Repository, tmp_path: Path
+) -> None:
+    campaign = repository.ensure_campaign("alice")
+    agent = make_agent(database, repository, tmp_path)
+
+    agent._prepare_automatic_jobs("alice", campaign)
+
+    finished = database.one("SELECT * FROM campaigns WHERE id=?", (campaign["id"],)) or {}
+    assert finished["status"] == "done"
+
+
 def test_metadata_candidates_are_planned_in_configured_batches(
     database: Database, repository: Repository, tmp_path: Path
 ) -> None:
