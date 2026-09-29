@@ -1,0 +1,51 @@
+name: lucarne-dev
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD: nextcloud
+    volumes:
+      - db:/var/lib/postgresql/data
+
+  nextcloud:
+    image: nextcloud:35-apache
+    depends_on:
+      - db
+    ports:
+      - "8080:80"
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD: nextcloud
+      NEXTCLOUD_ADMIN_USER: admin
+      NEXTCLOUD_ADMIN_PASSWORD: admin
+      NEXTCLOUD_TRUSTED_DOMAINS: localhost nextcloud
+    volumes:
+      - nextcloud:/var/www/html
+      - ../appinfo/info.xml:/lucarne/info.xml:ro
+      - ./apache-harp.conf:/etc/apache2/conf-enabled/harp.conf:ro
+
+  harp:
+    image: ghcr.io/nextcloud/nextcloud-appapi-harp:release
+    environment:
+      HP_SHARED_KEY: dev-only-shared-key
+      NC_INSTANCE_URL: http://nextcloud
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - certs:/certs
+    ports:
+      - "8780:8780"
+      - "8782:8782"
+
+volumes:
+  db:
+  nextcloud:
+  certs:
+
+networks:
+  default:
+    name: lucarne-dev

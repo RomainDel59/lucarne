@@ -652,6 +652,12 @@ class Agent:
             connection.execute("UPDATE campaigns SET phase=?,updated_at=? WHERE id=?", (phase, now(), campaign_id))
 
     def _finish_campaign(self, campaign_id: int, user_id: str) -> None:
+        pending = self.db.one(
+            "SELECT COUNT(*) AS count FROM agent_jobs WHERE campaign_id=? AND status IN ('queued','running')",
+            (campaign_id,),
+        )
+        if int((pending or {}).get("count", 0)):
+            return
         timestamp = now()
         with self.db.write() as connection:
             connection.execute(

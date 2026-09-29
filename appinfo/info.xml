@@ -8,7 +8,7 @@
 Follow YouTube channels, organize playlists and watch videos from a focused interface inside Nextcloud.
 Lucarne stores its catalogue and media in its own AppAPI persistent volume.
   ]]></description>
-  <version>1.0.0</version>
+  <version>1.0.1</version>
   <licence>AGPL-3.0-or-later</licence>
   <author>Lucarne contributors</author>
   <namespace>Lucarne</namespace>
@@ -23,7 +23,7 @@ Lucarne stores its catalogue and media in its own AppAPI persistent volume.
     <docker-install>
       <registry>ghcr.io</registry>
       <image>romaindel59/lucarne</image>
-      <image-tag>1.0.0</image-tag>
+      <image-tag>1.0.1</image-tag>
     </docker-install>
     <routes>
       <route>
