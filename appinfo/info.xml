@@ -13,16 +13,16 @@ Lucarne stores its catalogue and media in its own AppAPI persistent volume.
   <author>Lucarne contributors</author>
   <namespace>Lucarne</namespace>
   <category>multimedia</category>
-  <website>https://github.com/lucarne-app/lucarne</website>
-  <bugs>https://github.com/lucarne-app/lucarne/issues</bugs>
-  <repository type="git">https://github.com/lucarne-app/lucarne.git</repository>
+  <website>https://github.com/RomainDel59/lucarne</website>
+  <bugs>https://github.com/RomainDel59/lucarne/issues</bugs>
+  <repository type="git">https://github.com/RomainDel59/lucarne.git</repository>
   <dependencies>
     <nextcloud min-version="35" max-version="36" />
   </dependencies>
   <external-app>
     <docker-install>
       <registry>ghcr.io</registry>
-      <image>lucarne-app/lucarne</image>
+      <image>romaindel59/lucarne</image>
       <image-tag>1.0.0</image-tag>
     </docker-install>
     <routes>

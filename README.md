@@ -29,7 +29,7 @@ For a published release, install Lucarne from the Nextcloud Apps administration 
 For local development, build the image and register `appinfo/info.xml` with an AppAPI development deploy daemon:
 
 ```sh
-docker build -t ghcr.io/lucarne-app/lucarne:dev .
+docker build -t ghcr.io/romaindel59/lucarne:dev .
 ```
 
 The image contains Python, FastAPI, `yt-dlp` with its EJS challenge solver, Deno, FFmpeg, and the HaRP FRP client. No extra worker container or database is required.
