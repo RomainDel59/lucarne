@@ -17,6 +17,8 @@ data/
 *.db-wal
 .env
 .env.*
+!.env.example
+!.env.*.example
 *.key
 *.pem
 logs/
