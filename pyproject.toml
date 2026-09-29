@@ -1,0 +1,18 @@
+[project]
+name = "lucarne"
+version = "1.0.0"
+description = "A calm, private YouTube library for Nextcloud"
+requires-python = ">=3.12"
+license = { text = "AGPL-3.0-or-later" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "S"]
+ignore = ["E501", "S101", "S108", "S311", "S603", "S607", "S608"]
