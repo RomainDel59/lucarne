@@ -3,6 +3,8 @@
 from pathlib import Path
 from xml.etree import ElementTree
 
+from src import __version__
+
 
 def test_manifest_declares_every_proxied_surface() -> None:
     root = ElementTree.parse(Path(__file__).parents[1] / "appinfo" / "info.xml").getroot()  # noqa: S314
@@ -20,7 +22,8 @@ def test_manifest_and_runtime_versions_match() -> None:
     root = ElementTree.parse(Path(__file__).parents[1] / "appinfo" / "info.xml").getroot()  # noqa: S314
 
     assert root.findtext("id") == "lucarne"
-    assert root.findtext("version") == "1.0.0"
+    assert root.findtext("version") == __version__
+    assert root.findtext("./external-app/docker-install/image-tag") == __version__
 
 
 def test_container_includes_the_youtube_challenge_runtime() -> None:
