@@ -1,0 +1,9 @@
+[package]
+before_cmds = []
+
+[package.files]
+"appinfo" = "appinfo"
+"l10n" = "l10n"
+"LICENSE" = "LICENSE"
+"README.md" = "README.md"
+
