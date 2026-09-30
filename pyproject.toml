@@ -1,6 +1,6 @@
 [project]
 name = "lucarne"
-version = "1.0.1"
+version = "1.1.0"
 description = "A calm, private YouTube library for Nextcloud"
 requires-python = ">=3.12"
 license = { text = "AGPL-3.0-or-later" }
