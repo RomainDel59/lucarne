@@ -7,11 +7,11 @@
 				<AlertCircleIcon />
 			</template>
 		</NcEmptyContent>
-		<NcSettingsSection
+		<PageSection
 			v-else-if="data"
 			:name="t('Playback and collection')"
 			:description="t('Defaults inherited by channels, playlists and videos.')">
-			<form class="lucarne-settings-form" @submit.prevent="save">
+			<SectionForm :dirty="dirty" @submit="save" @cancel="reset">
 				<SelectField v-model="form.default_mode" :options="modeOptions" :label="t('Playback mode')" />
 				<SelectField
 					v-if="form.default_mode !== 'audio'"
@@ -27,26 +27,21 @@
 					required
 					:label="t('History limit')"
 					:helper-text="t('Use 0 for no limit. Channel and playlist settings take priority.')" />
-				<div>
-					<NcButton type="submit" variant="primary">
-						{{ t('Save') }}
-					</NcButton>
-				</div>
-			</form>
-		</NcSettingsSection>
+			</SectionForm>
+		</PageSection>
 	</div>
 </template>
 
 <script setup>
-import NcButton from '@nextcloud/vue/components/NcButton'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
-import NcSettingsSection from '@nextcloud/vue/components/NcSettingsSection'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
-import { reactive, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import AlertCircleIcon from 'vue-material-design-icons/AlertCircle.vue'
 import { request, send } from '../api.js'
 import PageHeader from '../components/PageHeader.vue'
+import PageSection from '../components/PageSection.vue'
+import SectionForm from '../components/SectionForm.vue'
 import SelectField from '../components/SelectField.vue'
 import { useAsync } from '../composables/useAsync.js'
 import { t } from '../i18n.js'
@@ -67,14 +62,24 @@ const audioOptions = ['96', '128', '192', '256'].map((value) => ({ id: value, la
 
 const { data, loading, error } = useAsync(() => request('api/settings/personal'), () => 'personal')
 
-watch(data, (values) => {
+function reset() {
+	const values = data.value
 	if (values) {
 		form.default_mode = values.default_mode
 		form.default_quality = String(values.default_quality)
 		form.default_audio_quality = String(values.default_audio_quality)
 		form.history_limit = String(values.history_limit)
 	}
-}, { immediate: true })
+}
+
+watch(data, reset, { immediate: true })
+
+const dirty = computed(() => Boolean(data.value) && (
+	form.default_mode !== data.value.default_mode
+	|| form.default_quality !== String(data.value.default_quality)
+	|| form.default_audio_quality !== String(data.value.default_audio_quality)
+	|| form.history_limit !== String(data.value.history_limit)
+))
 
 async function save() {
 	try {
@@ -85,18 +90,10 @@ async function save() {
 			history_limit: Number(form.history_limit),
 		})
 		state.bootstrap.personal_settings = await request('api/settings/personal')
+		data.value = state.bootstrap.personal_settings
 		notify(t('Settings saved'))
 	} catch (failure) {
 		notifyError(failure)
 	}
 }
 </script>
-
-<style scoped>
-.lucarne-settings-form {
-	display: flex;
-	flex-direction: column;
-	gap: calc(var(--default-grid-baseline) * 4);
-	max-width: 400px;
-}
-</style>

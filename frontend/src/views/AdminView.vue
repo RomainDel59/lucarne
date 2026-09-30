@@ -7,11 +7,11 @@
 				<AlertCircleIcon />
 			</template>
 		</NcEmptyContent>
-		<NcSettingsSection
+		<PageSection
 			v-else-if="data"
 			:name="t('Collection agent')"
 			:description="t('Control the pace of automatic YouTube requests and temporary media retention.')">
-			<form class="lucarne-settings-form" @submit.prevent="save">
+			<SectionForm :dirty="dirty" @submit="save" @cancel="reset">
 				<NcTextField
 					v-model="form.batch_size"
 					type="number"
@@ -30,26 +30,21 @@
 					required
 					:label="t('Temporary media retention (days)')"
 					:helper-text="t('The duration restarts after each playback. Quality variants remain separate.')" />
-				<div>
-					<NcButton type="submit" variant="primary">
-						{{ t('Save') }}
-					</NcButton>
-				</div>
-			</form>
-		</NcSettingsSection>
+			</SectionForm>
+		</PageSection>
 	</div>
 </template>
 
 <script setup>
-import NcButton from '@nextcloud/vue/components/NcButton'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
-import NcSettingsSection from '@nextcloud/vue/components/NcSettingsSection'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
-import { reactive, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import AlertCircleIcon from 'vue-material-design-icons/AlertCircle.vue'
 import { request, send } from '../api.js'
 import PageHeader from '../components/PageHeader.vue'
+import PageSection from '../components/PageSection.vue'
+import SectionForm from '../components/SectionForm.vue'
 import SelectField from '../components/SelectField.vue'
 import { useAsync } from '../composables/useAsync.js'
 import { t } from '../i18n.js'
@@ -82,29 +77,26 @@ const durationOptions = [
 
 const { data, loading, error } = useAsync(() => request('api/admin/settings'), () => 'admin')
 
-watch(data, (values) => {
-	if (values) {
+function reset() {
+	if (data.value) {
 		for (const key of Object.keys(form)) {
-			form[key] = String(values[key])
+			form[key] = String(data.value[key])
 		}
 	}
-}, { immediate: true })
+}
+
+watch(data, reset, { immediate: true })
+
+const dirty = computed(() => Boolean(data.value) && Object.keys(form).some((key) => form[key] !== String(data.value[key])))
 
 async function save() {
 	try {
-		await send('PUT', 'api/admin/settings', Object.fromEntries(Object.entries(form).map(([key, value]) => [key, Number(value)])))
+		const values = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, Number(value)]))
+		await send('PUT', 'api/admin/settings', values)
+		data.value = { ...data.value, ...values }
 		notify(t('Settings saved'))
 	} catch (failure) {
 		notifyError(failure)
 	}
 }
 </script>
-
-<style scoped>
-.lucarne-settings-form {
-	display: flex;
-	flex-direction: column;
-	gap: calc(var(--default-grid-baseline) * 4);
-	max-width: 400px;
-}
-</style>

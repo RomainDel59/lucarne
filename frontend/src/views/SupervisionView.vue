@@ -7,7 +7,7 @@
 				<AlertCircleIcon />
 			</template>
 		</NcEmptyContent>
-		<NcSettingsSection
+		<PageSection
 			v-else
 			:name="t('Agent')"
 			:description="t('Real-time campaign and batch supervision.')">
@@ -83,7 +83,7 @@
 					</template>
 				</NcListItem>
 			</ul>
-		</NcSettingsSection>
+		</PageSection>
 	</div>
 </template>
 
@@ -92,7 +92,6 @@ import NcActionButton from '@nextcloud/vue/components/NcActionButton'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 import NcListItem from '@nextcloud/vue/components/NcListItem'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
-import NcSettingsSection from '@nextcloud/vue/components/NcSettingsSection'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import AlertCircleIcon from 'vue-material-design-icons/AlertCircle.vue'
 import ArrowDownIcon from 'vue-material-design-icons/ArrowDown.vue'
@@ -101,6 +100,7 @@ import DeleteIcon from 'vue-material-design-icons/Delete.vue'
 import RefreshIcon from 'vue-material-design-icons/Refresh.vue'
 import { request, send } from '../api.js'
 import PageHeader from '../components/PageHeader.vue'
+import PageSection from '../components/PageSection.vue'
 import { countdown } from '../format.js'
 import { t } from '../i18n.js'
 import { presentationText, technicalLabel } from '../labels.js'
@@ -159,7 +159,6 @@ onBeforeUnmount(() => clearInterval(timer))
 	display: flex;
 	flex-direction: column;
 	gap: var(--default-grid-baseline);
-	max-width: 900px;
 }
 
 .lucarne-agent__empty {

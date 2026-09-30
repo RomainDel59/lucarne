@@ -7,7 +7,7 @@
 				<AlertCircleIcon />
 			</template>
 		</NcEmptyContent>
-		<NcSettingsSection
+		<PageSection
 			v-else-if="data"
 			:name="t('Channel catalogues')"
 			:description="t('Group subscriptions and browse their videos from the navigation.')">
@@ -41,7 +41,7 @@
 						</NcButton>
 					</template>
 				</div>
-				<template v-if="current">
+				<form v-if="current" class="lucarne-catalogues__editor" @submit.prevent="saveChannels">
 					<NcSelect
 						v-model="selectedIds"
 						:options="channelOptions"
@@ -49,17 +49,10 @@
 						label="label"
 						:input-label="t('Catalogue channels')"
 						multiple />
-					<div class="lucarne-catalogues__actions">
-						<NcButton variant="tertiary" :disabled="!dirty" @click="selectedIds = [...original]">
-							{{ t('Cancel') }}
-						</NcButton>
-						<NcButton variant="primary" :disabled="!dirty" @click="saveChannels">
-							{{ t('Save') }}
-						</NcButton>
-					</div>
-				</template>
+					<FormActions :dirty="dirty" @cancel="selectedIds = [...original]" />
+				</form>
 			</div>
-		</NcSettingsSection>
+		</PageSection>
 		<FormDialog
 			v-if="naming"
 			:name="naming.mode === 'add' ? t('Add a catalogue') : t('Edit catalogue')"
@@ -76,7 +69,6 @@ import NcButton from '@nextcloud/vue/components/NcButton'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
-import NcSettingsSection from '@nextcloud/vue/components/NcSettingsSection'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import { computed, ref } from 'vue'
 import AlertCircleIcon from 'vue-material-design-icons/AlertCircle.vue'
@@ -84,8 +76,10 @@ import DeleteIcon from 'vue-material-design-icons/Delete.vue'
 import PencilIcon from 'vue-material-design-icons/Pencil.vue'
 import PlusIcon from 'vue-material-design-icons/Plus.vue'
 import { request, send } from '../api.js'
+import FormActions from '../components/FormActions.vue'
 import FormDialog from '../components/FormDialog.vue'
 import PageHeader from '../components/PageHeader.vue'
+import PageSection from '../components/PageSection.vue'
 import SelectField from '../components/SelectField.vue'
 import { useAsync } from '../composables/useAsync.js'
 import { confirm } from '../dialogs.js'
@@ -212,7 +206,11 @@ async function saveChannels() {
 	display: flex;
 	flex-direction: column;
 	gap: calc(var(--default-grid-baseline) * 4);
-	max-width: 700px;
+}
+
+.lucarne-catalogues__editor {
+	display: grid;
+	gap: calc(var(--default-grid-baseline) * 4);
 }
 
 .lucarne-catalogues__toolbar {
@@ -224,11 +222,5 @@ async function saveChannels() {
 
 .lucarne-catalogues__select {
 	flex: 1 1 240px;
-}
-
-.lucarne-catalogues__actions {
-	display: flex;
-	justify-content: flex-end;
-	gap: calc(var(--default-grid-baseline) * 2);
 }
 </style>
