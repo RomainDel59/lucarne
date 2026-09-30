@@ -1,16 +1,8 @@
 <template>
 	<div ref="pageElement" class="lucarne-page">
 		<PageHeader :title="t('Subscriptions')">
-			<SelectField
-				v-model="catalog"
-				compact
-				:options="catalogOptions"
-				:label="t('Catalogue')" />
-			<SelectField
-				v-model="sort"
-				compact
-				:options="sortOptions"
-				:label="t('Alphabetical order')" />
+			<ToolbarMenu v-model="catalog" :options="catalogOptions" :label="t('Catalogue')" :icon="FilterVariantIcon" />
+				<ToolbarMenu v-model="sort" :options="sortOptions" :label="t('Sort')" :icon="SortIcon" />
 			<NcButton variant="primary" @click="adding = true">
 				<template #icon>
 					<PlusIcon :size="20" />
@@ -49,12 +41,19 @@ import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AlertCircleIcon from 'vue-material-design-icons/AlertCircle.vue'
+import FilterVariantIcon from 'vue-material-design-icons/FilterVariant.vue'
+import FolderMultipleOutlineIcon from 'vue-material-design-icons/FolderMultipleOutline.vue'
+import FolderOffOutlineIcon from 'vue-material-design-icons/FolderOffOutline.vue'
+import FolderOutlineIcon from 'vue-material-design-icons/FolderOutline.vue'
 import PlusIcon from 'vue-material-design-icons/Plus.vue'
+import SortAlphabeticalAscendingIcon from 'vue-material-design-icons/SortAlphabeticalAscending.vue'
+import SortClockDescendingIcon from 'vue-material-design-icons/SortClockDescending.vue'
+import SortIcon from 'vue-material-design-icons/Sort.vue'
 import YoutubeSubscriptionIcon from 'vue-material-design-icons/YoutubeSubscription.vue'
 import { request, send } from '../api.js'
 import EntityGrid from '../components/EntityGrid.vue'
 import PageHeader from '../components/PageHeader.vue'
-import SelectField from '../components/SelectField.vue'
+import ToolbarMenu from '../components/ToolbarMenu.vue'
 import UrlDialog from '../components/UrlDialog.vue'
 import { useAsync } from '../composables/useAsync.js'
 import { usePagedGrid } from '../composables/usePagedGrid.js'
@@ -79,13 +78,13 @@ const sort = computed({
 })
 
 const catalogOptions = computed(() => [
-	{ id: 'all', label: t('All catalogues') },
-	...state.bootstrap.catalogs.map((item) => ({ id: String(item.id), label: item.name })),
-	{ id: 'uncategorized', label: t('- Uncatalogued -') },
+	{ id: 'all', label: t('All catalogues'), icon: FolderMultipleOutlineIcon },
+	...state.bootstrap.catalogs.map((item) => ({ id: String(item.id), label: item.name, icon: FolderOutlineIcon })),
+	{ id: 'uncategorized', label: t('Uncatalogued'), icon: FolderOffOutlineIcon },
 ])
 const sortOptions = [
-	{ id: 'alpha', label: t('Alphabetical order') },
-	{ id: 'recent', label: t('Latest video') },
+	{ id: 'alpha', label: t('Alphabetical order'), icon: SortAlphabeticalAscendingIcon },
+	{ id: 'recent', label: t('Latest video'), icon: SortClockDescendingIcon },
 ]
 
 const { data, loading, error, reload } = useAsync(() => {

@@ -1,11 +1,7 @@
 <template>
 	<div ref="pageElement" class="lucarne-page">
 		<PageHeader :title="t('Playlists')">
-			<SelectField
-				v-model="sort"
-				compact
-				:options="sortOptions"
-				:label="t('Alphabetical order')" />
+			<ToolbarMenu v-model="sort" :options="sortOptions" :label="t('Sort')" :icon="SortIcon" />
 			<NcButton variant="primary" @click="adding = true">
 				<template #icon>
 					<PlusIcon :size="20" />
@@ -40,11 +36,14 @@ import { useRoute, useRouter } from 'vue-router'
 import AlertCircleIcon from 'vue-material-design-icons/AlertCircle.vue'
 import PlaylistPlayIcon from 'vue-material-design-icons/PlaylistPlay.vue'
 import PlusIcon from 'vue-material-design-icons/Plus.vue'
+import SortAlphabeticalAscendingIcon from 'vue-material-design-icons/SortAlphabeticalAscending.vue'
+import SortClockDescendingIcon from 'vue-material-design-icons/SortClockDescending.vue'
+import SortIcon from 'vue-material-design-icons/Sort.vue'
 import { request } from '../api.js'
 import AddPlaylistDialog from '../components/AddPlaylistDialog.vue'
 import EntityGrid from '../components/EntityGrid.vue'
 import PageHeader from '../components/PageHeader.vue'
-import SelectField from '../components/SelectField.vue'
+import ToolbarMenu from '../components/ToolbarMenu.vue'
 import { useAsync } from '../composables/useAsync.js'
 import { usePagedGrid } from '../composables/usePagedGrid.js'
 import { t } from '../i18n.js'
@@ -61,8 +60,8 @@ const sort = computed({
 	set: (value) => router.replace({ query: { ...route.query, page: undefined, sort: value === 'alpha' ? undefined : value } }),
 })
 const sortOptions = [
-	{ id: 'alpha', label: t('Alphabetical order') },
-	{ id: 'recent', label: t('Latest video') },
+	{ id: 'alpha', label: t('Alphabetical order'), icon: SortAlphabeticalAscendingIcon },
+	{ id: 'recent', label: t('Latest video'), icon: SortClockDescendingIcon },
 ]
 
 const { data, loading, error, reload } = useAsync(
