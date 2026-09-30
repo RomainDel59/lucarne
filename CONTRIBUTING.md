@@ -4,7 +4,7 @@ Thank you for improving Lucarne.
 
 ## Ground rules
 
-- Keep repository content, code, comments, logs, and documentation in English.
+- Keep repository content, code, comments, logs, and documentation in English. The README is the only document that is translated: translations live in `docs/translations/` as `README.<language>.md` and must be updated together with `README.md`.
 - Keep English as the source UI language and update French translations for user-visible changes.
 - Preserve user isolation in every query and file operation.
 - Avoid unbounded YouTube requests. Collection work must remain batched and sequential.
