@@ -49,6 +49,7 @@ select.lucarne-select:not(.button-vue)[multiple] { min-height: 280px; padding: 8
 input.lucarne-search:not(.button-vue) { width: min(420px, 40vw); }
 .lucarne-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 22px; }
 .lucarne-video-card { position: relative; min-width: 0; overflow: hidden; border-radius: var(--lucarne-radius); color: inherit; background: var(--lucarne-surface); box-shadow: var(--lucarne-shadow); cursor: pointer; transition: transform 150ms ease, box-shadow 150ms ease; }
+.lucarne-video-card:focus-visible { outline: 2px solid var(--color-main-text, currentColor); outline-offset: 2px; }
 .lucarne-video-card:hover, .lucarne-entity-card:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgb(0 0 0 / 14%); }
 .lucarne-video-card__media { position: relative; overflow: hidden; aspect-ratio: 16 / 9; background: var(--lucarne-surface-variant); }
 .lucarne-video-card__media img { width: 100%; height: 100%; object-fit: cover; transition: transform 180ms ease; }
