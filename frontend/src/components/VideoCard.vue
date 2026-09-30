@@ -144,6 +144,8 @@ const progress = computed(() => {
 
 .lucarne-video-card__title {
 	display: -webkit-box;
+	/* Room for two lines even when the title fits on one, so all tiles have the same height. */
+	min-height: calc(2em * var(--default-line-height, 1.5));
 	overflow: hidden;
 	font-weight: bold;
 	-webkit-box-orient: vertical;
