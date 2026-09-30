@@ -7,7 +7,7 @@
   --lucarne-border: var(--color-border, #d8d8d8);
   --lucarne-text: var(--color-main-text, #222);
   --lucarne-muted: var(--color-text-maxcontrast, #6b6b6b);
-  --lucarne-danger: #b3261e;
+  --lucarne-danger: var(--color-element-error, #c90000);
   --lucarne-radius: 18px;
   --lucarne-shadow: 0 1px 2px rgb(0 0 0 / 8%), 0 2px 8px rgb(0 0 0 / 5%);
 }
@@ -31,14 +31,16 @@ button.lucarne-nav-item:not(.button-vue) span { min-width: 0; overflow: hidden; 
 .lucarne-page-actions { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; gap: 8px; }
 button.lucarne-button:not(.button-vue) { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 18px; border: 0; border-radius: 20px; font: inherit; font-weight: 600; cursor: pointer; }
 button.lucarne-button--filled:not(.button-vue) { color: var(--lucarne-primary-text); background: var(--lucarne-primary); }
-button.lucarne-button--tonal:not(.button-vue) { color: var(--lucarne-primary); background: color-mix(in srgb, var(--lucarne-primary) 14%, transparent); }
+button.lucarne-button--tonal:not(.button-vue) { color: var(--color-primary-element-light-text, var(--lucarne-primary)); background: var(--color-primary-element-light, color-mix(in srgb, var(--lucarne-primary) 14%, transparent)); }
 button.lucarne-button--text:not(.button-vue) { color: var(--lucarne-primary); background: transparent; }
 button.lucarne-button--danger:not(.button-vue) { color: var(--lucarne-danger); background: transparent; }
-button.lucarne-button:not(.button-vue):hover { filter: brightness(.96); }
+button.lucarne-button--filled:not(.button-vue):hover { background: var(--color-primary-element-hover, var(--lucarne-primary)); }
+button.lucarne-button--tonal:not(.button-vue):hover { background: var(--color-primary-element-light-hover, var(--lucarne-hover)); }
+button.lucarne-button--text:not(.button-vue):hover, button.lucarne-button--danger:not(.button-vue):hover { background: var(--lucarne-hover); }
 button.lucarne-icon-button:not(.button-vue) { display: inline-grid; width: 40px; height: 40px; padding: 0; place-items: center; border: 0; border-radius: 50%; color: inherit; background: transparent; cursor: pointer; }
 button.lucarne-icon-button:not(.button-vue):hover { background: var(--lucarne-hover); }
 button.lucarne-menu-button:not(.button-vue) { display: none; }
-button.lucarne-scrim:not(.button-vue) { position: fixed; z-index: 40; inset: 0; padding: 0; border: 0; background: rgb(12 18 28 / 52%); }
+button.lucarne-scrim:not(.button-vue) { position: fixed; z-index: 40; inset: 0; padding: 0; border: 0; background: rgb(0 0 0 / 50%); }
 .lucarne-icon { width: 22px; height: 22px; flex: 0 0 auto; fill: currentColor; }
 .lucarne-input, .lucarne-select { box-sizing: border-box; width: 100%; min-height: 48px; padding: 10px 14px; border: 1px solid var(--lucarne-border); border-radius: 12px; color: var(--lucarne-text); background: var(--lucarne-surface); font: inherit; }
 .lucarne-search { width: min(420px, 40vw); }
@@ -49,7 +51,7 @@ button.lucarne-scrim:not(.button-vue) { position: fixed; z-index: 40; inset: 0; 
 .lucarne-video-card__media img { width: 100%; height: 100%; object-fit: cover; transition: transform 180ms ease; }
 .lucarne-video-card:hover .lucarne-video-card__media img, .lucarne-entity-card:hover img { transform: scale(1.035); }
 .lucarne-video-card__duration { position: absolute; right: 8px; bottom: 8px; padding: 2px 6px; border-radius: 5px; color: #fff; background: rgb(0 0 0 / 78%); font-size: 12px; }
-.lucarne-video-card__unavailable { position: absolute; top: 8px; left: 8px; padding: 3px 7px; border-radius: 6px; color: #fff; background: rgb(179 38 30 / 92%); font-size: 12px; font-weight: 650; }
+.lucarne-video-card__unavailable { position: absolute; top: 8px; left: 8px; padding: 3px 7px; border-radius: 6px; color: var(--color-error-text, #fff); background: var(--color-error, #b3261e); font-size: 12px; font-weight: 650; }
 .lucarne-video-card__progress { position: absolute; right: 0; bottom: 0; left: 0; width: 0; height: 4px; background: var(--lucarne-primary); }
 .lucarne-video-card__body { display: flex; min-height: 94px; flex-direction: column; padding: 14px 14px 12px; }
 .lucarne-video-card__title { display: -webkit-box; overflow: hidden; font-weight: 650; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
@@ -83,7 +85,7 @@ button.lucarne-entity-card:not(.button-vue) { display: flex; min-width: 0; align
 .lucarne-video-meta { display: flex; min-width: 0; align-items: center; gap: 12px; }
 .lucarne-description, .lucarne-panel { padding: 20px; border-radius: var(--lucarne-radius); background: var(--lucarne-surface-variant); }
 .lucarne-description { white-space: pre-wrap; }
-.lucarne-warning { margin: 16px 0; padding: 14px 16px; border-radius: 12px; color: var(--lucarne-danger); background: color-mix(in srgb, var(--lucarne-danger) 10%, transparent); }
+.lucarne-warning { margin: 16px 0; padding: 14px 16px; border-radius: 12px; color: var(--color-error-text, var(--lucarne-danger)); background: var(--color-error, color-mix(in srgb, var(--lucarne-danger) 10%, transparent)); }
 .lucarne-panel { margin-bottom: 20px; }
 .lucarne-panel h2 { margin: 0 0 8px; font-size: 19px; }
 .lucarne-panel p { margin: 0 0 18px; color: var(--lucarne-muted); }
@@ -115,8 +117,8 @@ button.lucarne-entity-card:not(.button-vue) { display: flex; min-width: 0; align
 .lucarne-job__details ul { margin: 8px 0 0; padding-left: 20px; }
 .lucarne-job__error { color: var(--lucarne-danger) !important; }
 .lucarne-job--future { opacity: .72; }
-.lucarne-snackbar { position: fixed; z-index: 10001; right: 24px; bottom: 24px; max-width: min(440px, calc(100vw - 48px)); padding: 14px 18px; border-radius: 10px; color: #fff; background: #2f3033; box-shadow: 0 8px 24px rgb(0 0 0 / 24%); }
-.lucarne-snackbar--error { background: var(--lucarne-danger); }
+.lucarne-snackbar { position: fixed; z-index: 10001; right: 24px; bottom: 24px; max-width: min(440px, calc(100vw - 48px)); padding: 14px 18px; border: 1px solid var(--lucarne-border); border-radius: 10px; color: var(--lucarne-text); background: var(--lucarne-surface); box-shadow: 0 8px 24px rgb(0 0 0 / 24%); }
+.lucarne-snackbar--error { color: var(--color-error-text, var(--lucarne-text)); background: var(--color-error, var(--lucarne-surface)); }
 .lucarne-loading { display: grid; min-height: 260px; place-items: center; color: var(--lucarne-muted); }
 .lucarne-spinner { width: 38px; height: 38px; border: 4px solid var(--lucarne-border); border-top-color: var(--lucarne-primary); border-radius: 50%; animation: lucarne-spin .8s linear infinite; }
 @keyframes lucarne-spin { to { transform: rotate(360deg); } }
