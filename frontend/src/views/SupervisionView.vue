@@ -223,4 +223,11 @@ onBeforeUnmount(() => clearInterval(timer))
 	padding-inline: calc(var(--default-grid-baseline) * 3);
 	color: var(--color-text-maxcontrast);
 }
+
+/* The details line up with the text of the button, a bit smaller, to read as a sub-element. */
+.lucarne-agent__details ul {
+	margin-inline-start: calc(var(--default-clickable-area) + var(--default-grid-baseline) * 0.25);
+	padding-block-end: var(--default-grid-baseline);
+	font-size: var(--font-size-small, 13px);
+}
 </style>
