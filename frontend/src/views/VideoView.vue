@@ -333,12 +333,14 @@ async function deleteVideo() {
 
 <style scoped>
 .lucarne-player-shell {
+	/* Leave room below the player for the title, the actions and the start of the description. */
+	--lucarne-player-max-height: max(240px, calc(100vh - 300px));
 	position: relative;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	aspect-ratio: 16 / 9;
-	max-height: 75vh;
+	max-height: var(--lucarne-player-max-height);
 	overflow: hidden;
 	border-radius: var(--border-radius-container);
 	/* The video frame itself stays dark, whatever the theme. */
@@ -376,7 +378,7 @@ async function deleteVideo() {
 
 .lucarne-player {
 	width: 100%;
-	max-height: 75vh;
+	max-height: var(--lucarne-player-max-height);
 }
 
 .lucarne-video-toolbar {
