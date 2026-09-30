@@ -193,7 +193,9 @@ onBeforeUnmount(() => clearInterval(timer))
 }
 
 /* These rows have no link: no pointer cursor and no hover highlight, which suggest a click. */
-.lucarne-agent :deep(.list-item) {
+.lucarne-agent :deep(.list-item),
+.lucarne-agent :deep(.list-item__anchor),
+.lucarne-agent :deep(.list-item__anchor *) {
 	cursor: default;
 }
 
