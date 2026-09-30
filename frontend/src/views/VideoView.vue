@@ -49,6 +49,7 @@
 						:src="mediaSrc"
 						:poster="thumbnail"
 						controls
+						disablepictureinpicture
 						playsinline
 						@loadedmetadata="resume"
 						@timeupdate="scheduleProgress"
