@@ -46,5 +46,9 @@ def test_video_format_applies_both_video_and_audio_quality() -> None:
     assert "vcodec^=avc1" in value
 
 
+def test_audio_quality_of_64_kbps_is_supported() -> None:
+    assert "abr<=64" in quality_format("720", "64")
+
+
 def test_both_youtube_channel_image_hosts_are_allowed() -> None:
     assert {"yt3.ggpht.com", "yt3.googleusercontent.com"} <= ALLOWED_IMAGE_HOSTS

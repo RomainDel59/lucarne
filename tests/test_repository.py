@@ -65,6 +65,10 @@ def test_video_pagination_is_fixed_to_ten(repository: Repository) -> None:
     assert len(second["items"]) == 2
     assert first["total"] == 12
 
+    wide = repository.videos("alice", page=2, page_size=5)
+    assert wide["page_size"] == 5
+    assert len(wide["items"]) == 5
+
 
 def test_pending_videos_share_the_fixed_page_size(repository: Repository) -> None:
     for index in range(12):
@@ -222,6 +226,15 @@ def test_instance_settings_accept_only_supported_schedules(repository: Repositor
                 "temporary_retention_days": 7,
             }
         )
+
+
+def test_batch_size_accepts_one_video_and_rejects_the_extremes(repository: Repository) -> None:
+    values = {"lot_wait_seconds": 300, "campaign_duration_seconds": 7200, "temporary_retention_days": 7}
+    assert repository.update_instance_settings({**values, "batch_size": 1})["batch_size"] == 1
+
+    for invalid in (0, 51):
+        with pytest.raises(ValueError, match="batch size"):
+            repository.update_instance_settings({**values, "batch_size": invalid})
 
 
 def test_upload_date_is_used_when_youtube_has_no_timestamp(repository: Repository) -> None:

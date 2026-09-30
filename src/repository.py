@@ -97,8 +97,8 @@ class Repository:
         lot_wait = int(values.get("lot_wait_seconds", 300))
         duration = int(values.get("campaign_duration_seconds", 7200))
         retention = int(values.get("temporary_retention_days", 7))
-        if not 5 <= batch_size <= 50:
-            raise ValueError("The batch size must be between 5 and 50.")
+        if not 1 <= batch_size <= 50:
+            raise ValueError("The batch size must be between 1 and 50.")
         if lot_wait not in {60, 120, 300, 600, 900, 1800, 3600}:
             raise ValueError("The delay between batches is invalid.")
         if duration not in {1800, 3600, 7200, 14400, 28800, 43200}:
@@ -306,6 +306,7 @@ class Repository:
         uncategorized: bool = False,
         search: str = "",
         pending_count: int = 0,
+        page_size: int = 10,
     ) -> dict[str, Any]:
         page = max(1, page)
         conditions = ["v.user_id=?", "v.deleting=0"]
@@ -334,9 +335,9 @@ class Repository:
         total = self.db.one(
             f"SELECT COUNT(DISTINCT v.id) AS count FROM videos v{joins} WHERE {where}", tuple(parameters)
         )
-        offset = (page - 1) * 10
-        pending_on_page = max(0, min(10, pending_count - offset))
-        video_limit = 10 - pending_on_page
+        offset = (page - 1) * page_size
+        pending_on_page = max(0, min(page_size, pending_count - offset))
+        video_limit = page_size - pending_on_page
         video_offset = max(0, offset - pending_count)
         rows = (
             self.db.all(
@@ -352,7 +353,7 @@ class Repository:
         return {
             "items": rows,
             "page": page,
-            "page_size": 10,
+            "page_size": page_size,
             "total": int((total or {}).get("count", 0)) + pending_count,
         }
 
@@ -554,7 +555,7 @@ class Repository:
         with self.db.write() as connection:
             connection.execute("DELETE FROM channel_catalogs WHERE id=? AND user_id=?", (catalog_id, user_id))
 
-    def history(self, user_id: str, page: int = 1) -> dict[str, Any]:
+    def history(self, user_id: str, page: int = 1, page_size: int = 10) -> dict[str, Any]:
         page = max(1, page)
         total = self.db.one(
             """SELECT COUNT(*) AS count FROM histories h JOIN videos v ON v.id=h.video_id AND v.user_id=h.user_id
@@ -565,10 +566,10 @@ class Repository:
             """SELECT v.*,h.position AS history_position,h.duration AS history_duration,h.completed AS history_completed,
                       h.updated_at AS history_updated_at
                FROM histories h JOIN videos v ON v.id=h.video_id AND v.user_id=h.user_id
-               WHERE h.user_id=? AND v.deleting=0 ORDER BY h.updated_at DESC LIMIT 10 OFFSET ?""",
-            (user_id, (page - 1) * 10),
+               WHERE h.user_id=? AND v.deleting=0 ORDER BY h.updated_at DESC LIMIT ? OFFSET ?""",
+            (user_id, page_size, (page - 1) * page_size),
         )
-        return {"items": items, "page": page, "page_size": 10, "total": int((total or {}).get("count", 0))}
+        return {"items": items, "page": page, "page_size": page_size, "total": int((total or {}).get("count", 0))}
 
     def save_history(self, user_id: str, video_id: int, position: float, duration: float | None) -> None:
         self.video(user_id, video_id)
@@ -866,7 +867,7 @@ class Repository:
             raise ValueError("Invalid playback mode.")
         if quality not in {"360", "480", "720", "1080", "best"}:
             raise ValueError("Invalid video quality.")
-        if audio not in {"96", "128", "192", "256"}:
+        if audio not in {"64", "96", "128", "192", "256"}:
             raise ValueError("Invalid audio quality.")
 
     def _nullable_playback(

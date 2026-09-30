@@ -1,0 +1,26 @@
+import { reactive } from 'vue'
+import { request } from './api.js'
+import { i18n } from './i18n.js'
+
+export const state = reactive({ bootstrap: null })
+
+export async function loadBootstrap() {
+	const data = await request('api/bootstrap')
+	i18n.translations = data.translations || {}
+	i18n.language = data.language || 'en'
+	state.bootstrap = data
+}
+
+export function setCatalogs(catalogs) {
+	state.bootstrap.catalogs = catalogs
+}
+
+let pending = null
+
+/**
+ * Load the bootstrap data once; later callers wait for the same request.
+ */
+export function ensureBootstrap() {
+	pending ??= loadBootstrap()
+	return pending
+}

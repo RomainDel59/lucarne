@@ -68,7 +68,7 @@ docker build --pull -t lucarne:test .
 docker run --rm --entrypoint python lucarne:test -m compileall -q /app/src
 ```
 
-The web client is plain browser JavaScript and CSS served through the authenticated AppAPI proxy. It intentionally has no Node build step.
+The web client is a Vue application built with the same Nextcloud components as the Files app (`@nextcloud/vue`), so it follows whichever theme is applied in Nextcloud. Its sources are in `frontend/`. The Docker build compiles them into a single script and stylesheet, `static/js/lucarne-main.js` and `static/css/lucarne.css`, served through the authenticated AppAPI proxy. The front-end libraries are pinned to the versions used by Nextcloud 35.
 
 ## Localization
 

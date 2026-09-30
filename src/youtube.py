@@ -39,7 +39,7 @@ UNAVAILABLE_MARKERS = (
 
 
 def quality_format(quality: str, audio_quality: str) -> str:
-    if audio_quality not in {"96", "128", "192", "256"}:
+    if audio_quality not in {"64", "96", "128", "192", "256"}:
         raise LucarneError("Invalid audio quality.")
     audio = f"ba[acodec^=mp4a][abr<={audio_quality}]"
     if quality == "best":

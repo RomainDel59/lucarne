@@ -31,6 +31,11 @@ def test_stable_errors_are_localized_but_unknown_details_are_preserved() -> None
 def test_french_catalog_has_unique_keys_and_covers_the_ui() -> None:
     raw_catalog = (ROOT / "static" / "i18n" / "fr.json").read_text(encoding="utf-8")
     translations = json.loads(raw_catalog, object_pairs_hook=reject_duplicate_keys)
-    javascript = (ROOT / "static" / "js" / "lucarne-main.js").read_text(encoding="utf-8")
-    ui_keys = set(re.findall(r"\bt\('([^']+)'", javascript))
-    assert ui_keys <= translations.keys()
+    sources = [
+        path.read_text(encoding="utf-8")
+        for path in sorted((ROOT / "frontend" / "src").rglob("*"))
+        if path.suffix in {".js", ".vue"}
+    ]
+    ui_keys = {key for source in sources for key in re.findall(r"\bt\('([^']+)'", source)}
+    assert ui_keys, "No translation key found in the front-end sources."
+    assert ui_keys <= translations.keys(), sorted(ui_keys - translations.keys())
