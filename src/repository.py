@@ -867,7 +867,7 @@ class Repository:
             raise ValueError("Invalid playback mode.")
         if quality not in {"360", "480", "720", "1080", "best"}:
             raise ValueError("Invalid video quality.")
-        if audio not in {"96", "128", "192", "256"}:
+        if audio not in {"64", "96", "128", "192", "256"}:
             raise ValueError("Invalid audio quality.")
 
     def _nullable_playback(

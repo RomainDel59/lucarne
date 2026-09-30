@@ -59,7 +59,7 @@ const qualityOptions = [
 ]
 const audioOptions = [
 	{ id: INHERIT, label: inheritLabel(`${inherited.audio_quality || 128} kbps`) },
-	...['96', '128', '192', '256'].map((value) => ({ id: value, label: `${value} kbps` })),
+	...['64', '96', '128', '192', '256'].map((value) => ({ id: value, label: `${value} kbps` })),
 ]
 const historyOptions = [
 	{ id: INHERIT, label: inheritLabel(historyLabel) },

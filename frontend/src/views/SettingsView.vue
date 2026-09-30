@@ -58,7 +58,7 @@ const qualityOptions = [
 	...['360', '480', '720', '1080'].map((value) => ({ id: value, label: `${value}p` })),
 	{ id: 'best', label: t('Best available') },
 ]
-const audioOptions = ['96', '128', '192', '256'].map((value) => ({ id: value, label: `${value} kbps` }))
+const audioOptions = ['64', '96', '128', '192', '256'].map((value) => ({ id: value, label: `${value} kbps` }))
 
 const { data, loading, error } = useAsync(() => request('api/settings/personal'), () => 'personal')
 
