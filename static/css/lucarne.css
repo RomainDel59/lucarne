@@ -90,7 +90,7 @@
 .lucarne-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
 .lucarne-field { display: grid; gap: 7px; }
 .lucarne-field label { font-size: 13px; font-weight: 650; }
-.lucarne-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 0; border-radius: 24px; color: var(--lucarne-text); background: var(--lucarne-surface); box-shadow: 0 16px 48px rgb(0 0 0 / 28%); }
+.lucarne-dialog { inset: 0; margin: auto; width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 0; border-radius: 24px; color: var(--lucarne-text); background: var(--lucarne-surface); box-shadow: 0 16px 48px rgb(0 0 0 / 28%); }
 .lucarne-dialog::backdrop { background: rgb(0 0 0 / 42%); }
 .lucarne-dialog form { display: grid; max-height: inherit; }
 .lucarne-dialog header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 24px 24px 8px; }
