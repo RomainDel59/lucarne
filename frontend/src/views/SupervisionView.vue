@@ -63,14 +63,21 @@
 						</template>
 					</NcListItem>
 					<li v-if="job.presentation?.details?.length" class="lucarne-agent__details">
-						<details>
-							<summary>{{ t('Show details ({count})', { count: job.presentation.details.length }) }}</summary>
-							<ul>
-								<li v-for="line in job.presentation.details" :key="line">
-									{{ presentationText(line) }}
-								</li>
-							</ul>
-						</details>
+						<NcButton
+							variant="tertiary"
+							:aria-expanded="expanded.has(job.id)"
+							@click="toggle(job.id)">
+							<template #icon>
+								<ChevronDownIcon v-if="expanded.has(job.id)" :size="20" />
+								<ChevronRightIcon v-else :size="20" />
+							</template>
+							{{ t('Show details ({count})', { count: job.presentation.details.length }) }}
+						</NcButton>
+						<ul v-if="expanded.has(job.id)">
+							<li v-for="line in job.presentation.details" :key="line">
+								{{ presentationText(line) }}
+							</li>
+						</ul>
 					</li>
 				</template>
 				<NcListItem
@@ -89,6 +96,7 @@
 
 <script setup>
 import NcActionButton from '@nextcloud/vue/components/NcActionButton'
+import NcButton from '@nextcloud/vue/components/NcButton'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 import NcListItem from '@nextcloud/vue/components/NcListItem'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
@@ -96,6 +104,8 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import AlertCircleIcon from 'vue-material-design-icons/AlertCircle.vue'
 import ArrowDownIcon from 'vue-material-design-icons/ArrowDown.vue'
 import ArrowUpIcon from 'vue-material-design-icons/ArrowUp.vue'
+import ChevronDownIcon from 'vue-material-design-icons/ChevronDown.vue'
+import ChevronRightIcon from 'vue-material-design-icons/ChevronRight.vue'
 import DeleteIcon from 'vue-material-design-icons/Delete.vue'
 import RefreshIcon from 'vue-material-design-icons/Refresh.vue'
 import { request, send } from '../api.js'
@@ -108,6 +118,7 @@ import { notifyError } from '../notify.js'
 
 const data = ref(null)
 const failure = ref('')
+const expanded = ref(new Set())
 let timer = null
 
 const seconds = computed(() => Math.max(0, Number(data.value.campaign.next_lot_at) - Number(data.value.server_time)))
@@ -119,6 +130,14 @@ const operation = computed(() => {
 		? presentationText(presentation.title, presentation.variables)
 		: technicalLabel(`phase.${data.value.campaign.phase || 'discover'}`)
 })
+
+function toggle(id) {
+	const next = new Set(expanded.value)
+	if (!next.delete(id)) {
+		next.add(id)
+	}
+	expanded.value = next
+}
 
 function jobTitle(job) {
 	const presentation = job.presentation || {}
