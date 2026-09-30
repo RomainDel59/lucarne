@@ -24,42 +24,55 @@
 				<template v-for="job in data.jobs" :key="job.id">
 					<NcListItem
 						:name="jobTitle(job)"
-						:details="`${technicalLabel(`status.${job.status}`)} · ${job.manual ? t('User request') : t('Automatic')}`"
-						force-display-actions>
+						:details="`${technicalLabel(`status.${job.status}`)} · ${job.manual ? t('User request') : t('Automatic')}`">
 						<template #subname>
 							{{ job.error || presentationText(job.presentation?.summary) }}
 						</template>
-						<template #actions>
-							<NcActionButton
-								v-if="job.status === 'queued'"
-								:disabled="queued.indexOf(job) === 0"
-								@click="alter(job, 'move', { direction: 'up' })">
-								<template #icon>
-									<ArrowUpIcon :size="20" />
-								</template>
-								{{ t('Move up') }}
-							</NcActionButton>
-							<NcActionButton
-								v-if="job.status === 'queued'"
-								:disabled="queued.indexOf(job) === queued.length - 1"
-								@click="alter(job, 'move', { direction: 'down' })">
-								<template #icon>
-									<ArrowDownIcon :size="20" />
-								</template>
-								{{ t('Move down') }}
-							</NcActionButton>
-							<NcActionButton v-if="job.status === 'error'" @click="alter(job, 'retry')">
-								<template #icon>
-									<RefreshIcon :size="20" />
-								</template>
-								{{ t('Retry') }}
-							</NcActionButton>
-							<NcActionButton v-if="job.status !== 'running'" @click="alter(job, 'delete')">
-								<template #icon>
-									<DeleteIcon :size="20" />
-								</template>
-								{{ t('Delete') }}
-							</NcActionButton>
+						<template #extra-actions>
+							<div class="lucarne-agent__actions">
+								<NcButton
+									v-if="job.status === 'queued'"
+									variant="tertiary"
+									:title="t('Move up')"
+									:aria-label="t('Move up')"
+									:disabled="queued.indexOf(job) === 0"
+									@click="alter(job, 'move', { direction: 'up' })">
+									<template #icon>
+										<ArrowUpIcon :size="20" />
+									</template>
+								</NcButton>
+								<NcButton
+									v-if="job.status === 'queued'"
+									variant="tertiary"
+									:title="t('Move down')"
+									:aria-label="t('Move down')"
+									:disabled="queued.indexOf(job) === queued.length - 1"
+									@click="alter(job, 'move', { direction: 'down' })">
+									<template #icon>
+										<ArrowDownIcon :size="20" />
+									</template>
+								</NcButton>
+								<NcButton
+									v-if="job.status === 'error'"
+									variant="tertiary"
+									:title="t('Retry')"
+									:aria-label="t('Retry')"
+									@click="alter(job, 'retry')">
+									<template #icon>
+										<RefreshIcon :size="20" />
+									</template>
+								</NcButton>
+								<NcButton
+									v-if="job.status !== 'running'"
+									variant="tertiary"
+									:title="t('Delete')"
+									:aria-label="t('Delete')"
+									@click="alter(job, 'delete')">
+									<template #icon>
+										<DeleteIcon :size="20" />
+									</template>
+								</NcButton>
+							</div>
 						</template>
 					</NcListItem>
 					<li v-if="job.presentation?.details?.length" class="lucarne-agent__details">
@@ -95,7 +108,6 @@
 </template>
 
 <script setup>
-import NcActionButton from '@nextcloud/vue/components/NcActionButton'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 import NcListItem from '@nextcloud/vue/components/NcListItem'
@@ -178,6 +190,26 @@ onBeforeUnmount(() => clearInterval(timer))
 	display: flex;
 	flex-direction: column;
 	gap: var(--default-grid-baseline);
+}
+
+/* These rows have no link: no pointer cursor and no hover highlight, which suggest a click. */
+.lucarne-agent :deep(.list-item) {
+	cursor: default;
+}
+
+.lucarne-agent :deep(.list-item:hover),
+.lucarne-agent :deep(.list-item:focus-within) {
+	background-color: transparent !important;
+}
+
+.lucarne-agent__actions {
+	display: flex;
+	align-items: center;
+	gap: var(--default-grid-baseline);
+}
+
+.lucarne-agent :deep(.list-item-content__extra-actions) {
+	align-self: flex-start;
 }
 
 .lucarne-agent__empty {
