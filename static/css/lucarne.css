@@ -63,8 +63,8 @@ button.lucarne-entity-card:not(.button-vue) { display: flex; min-width: 0; align
 .lucarne-entity-card__image { display: grid; width: 72px; height: 72px; flex: 0 0 72px; overflow: hidden; place-items: center; border-radius: 50%; color: var(--lucarne-primary); background: var(--lucarne-surface-variant); }
 .lucarne-entity-card--playlist .lucarne-entity-card__image { border-radius: 14px; }
 .lucarne-entity-card__image img { width: 100%; height: 100%; object-fit: cover; transition: transform 180ms ease; }
-.lucarne-entity-card__copy { min-width: 0; }
-.lucarne-entity-card__title, .lucarne-entity-card__subtitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lucarne-entity-card__copy { display: block; flex: 1 1 auto; min-width: 0; }
+.lucarne-entity-card__title, .lucarne-entity-card__subtitle { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lucarne-entity-card__title { font-weight: 650; }
 .lucarne-entity-card__subtitle { margin-top: 5px; color: var(--lucarne-muted); font-size: 13px; }
 .lucarne-status { display: block; margin-top: 5px; color: var(--lucarne-primary); font-size: 12px; font-weight: 650; }
