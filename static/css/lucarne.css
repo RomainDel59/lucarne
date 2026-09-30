@@ -93,8 +93,9 @@ button.lucarne-entity-card:not(.button-vue) { display: flex; min-width: 0; align
 .lucarne-panel h2 { margin: 0 0 8px; font-size: 19px; }
 .lucarne-panel p { margin: 0 0 18px; color: var(--lucarne-muted); }
 .lucarne-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
-.lucarne-field { display: grid; gap: 7px; }
+.lucarne-field { display: grid; align-content: start; gap: 7px; }
 .lucarne-field label { font-size: 13px; font-weight: 650; }
+.lucarne-panel > .lucarne-field, .lucarne-panel > button.lucarne-button:not(.button-vue) { margin-top: 16px; }
 .lucarne-dialog { inset: 0; margin: auto; width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 0; border-radius: 24px; color: var(--lucarne-text); background: var(--lucarne-surface); box-shadow: 0 16px 48px rgb(0 0 0 / 28%); }
 .lucarne-dialog::backdrop { background: rgb(0 0 0 / 42%); }
 .lucarne-dialog form { display: grid; max-height: inherit; }
@@ -104,7 +105,7 @@ button.lucarne-entity-card:not(.button-vue) { display: flex; min-width: 0; align
 .lucarne-dialog footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px 20px; }
 .lucarne-switch { display: inline-flex; align-items: center; gap: 8px; }
 .lucarne-switch input { width: 42px; height: 24px; accent-color: var(--lucarne-primary); }
-.lucarne-transfer { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 14px; align-items: start; }
+.lucarne-transfer { display: grid; margin-top: 16px; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 14px; align-items: start; }
 .lucarne-transfer__buttons { display: grid; gap: 8px; padding-top: 38px; }
 .lucarne-agent-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-bottom: 20px; }
 .lucarne-stat { padding: 18px; border: 1px solid var(--lucarne-border); border-radius: 16px; }
