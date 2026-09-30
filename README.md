@@ -6,13 +6,14 @@ Lucarne is a Nextcloud AppAPI external application. Its API, catalogue agent, me
 
 ## Features
 
-- Ten-video chronological home pages with previous and next navigation
-- Channel subscriptions and YouTube or personal playlists
+- Chronological video pages showing two complete rows per page, with icon-only previous and next buttons
+- Channel subscriptions and YouTube or personal playlists, in paginated grids that can be sorted and filtered
 - Alphabetical catalogues and an automatic uncatalogued view
-- Per-user playback quality, audio mode, history depth, and catalogue membership
+- Per-user playback quality (video up to 1080p, audio from 64 to 256 kbps), audio mode, history depth, and catalogue membership
 - Immediate download-and-play with HTTP range support
 - Sliding temporary-media retention and optional offline retention
 - Persistent, rate-conscious catalogue campaigns and visible batch supervision
+- Interface built with Nextcloud components, following the light, dark, or custom theme of each user
 - English source language and bundled French localization
 - Multi-user isolation from the first stored record
 
@@ -32,7 +33,9 @@ For local development, build the image and register `appinfo/info.xml` with an A
 docker build -t ghcr.io/romaindel59/lucarne:dev .
 ```
 
-The image contains Python, FastAPI, `yt-dlp` with its EJS challenge solver, Deno, FFmpeg, and the HaRP FRP client. No extra worker container or database is required.
+The image contains Python, FastAPI, `yt-dlp` with its EJS challenge solver, Deno, FFmpeg, the compiled web interface, and the HaRP FRP client. No extra worker container or database is required.
+
+To try Lucarne in a disposable Nextcloud, follow "Try Lucarne in a local Nextcloud" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Data layout
 
@@ -68,16 +71,24 @@ docker build --pull -t lucarne:test .
 docker run --rm --entrypoint python lucarne:test -m compileall -q /app/src
 ```
 
-The web client is a Vue application built with the same Nextcloud components as the Files app (`@nextcloud/vue`), so it follows whichever theme is applied in Nextcloud. Its sources are in `frontend/`. The Docker build compiles them into a single script and stylesheet, `static/js/lucarne-main.js` and `static/css/lucarne.css`, served through the authenticated AppAPI proxy. The front-end libraries are pinned to the versions used by Nextcloud 35.
+The web client is a Vue application built with the same Nextcloud components as the Files app (`@nextcloud/vue`), so it follows whichever theme is applied in Nextcloud. Its sources are in `frontend/`. The Docker build compiles them into a single script and stylesheet, `static/js/lucarne-main.js` and `static/css/lucarne.css`, served through the authenticated AppAPI proxy. These two generated files are not committed; to build them outside Docker, use Node.js 20.11 or later:
+
+```sh
+cd frontend
+npm ci
+npm run build
+```
+
+The front-end libraries are pinned to the versions used by Nextcloud 35.
 
 ## Localization
 
-English strings are the source strings. Runtime web translations live in `static/i18n/<language>.json`; Nextcloud application metadata translations live in `l10n/`.
+English strings are the source strings, written as `t('English text')` in the web interface. Runtime web translations live in `static/i18n/<language>.json`, where `en.json` is empty because English needs no translation; Nextcloud application metadata translations live in `l10n/`.
 
 When adding a language:
 
-1. Copy `static/i18n/en.json` to the new locale name.
-2. Translate every key without changing placeholders such as `{count}`.
+1. Copy `static/i18n/fr.json` to the new locale name.
+2. Translate every value without changing the keys or placeholders such as `{count}`.
 3. Add the matching Nextcloud `l10n/<language>.json` and `.js` files.
 4. Add the language code to `SUPPORTED_LANGUAGES` in `src/localization.py`.
 
