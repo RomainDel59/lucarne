@@ -1,4 +1,12 @@
 # syntax=docker/dockerfile:1.7
+FROM --platform=$BUILDPLATFORM node:22-slim AS frontend
+
+WORKDIR /build
+COPY frontend/package.json frontend/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci
+COPY frontend/ ./
+RUN LUCARNE_STATIC_DIR=/out npm run build
+
 FROM python:3.12-slim-bookworm AS builder
 
 ARG TARGETARCH
@@ -54,6 +62,7 @@ RUN apt-get update \
 COPY --from=builder /install/ /usr/local/
 COPY --chown=lucarne:lucarne src/ /app/src/
 COPY --chown=lucarne:lucarne static/ /app/static/
+COPY --from=frontend --chown=lucarne:lucarne /out/ /app/static/
 COPY --chmod=0755 start.sh healthcheck.sh /
 
 WORKDIR /app
