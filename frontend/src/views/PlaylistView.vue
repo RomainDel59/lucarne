@@ -1,5 +1,5 @@
 <template>
-	<div class="lucarne-page">
+	<div ref="pageElement" class="lucarne-page">
 		<PageHeader :title="title">
 			<template v-if="data">
 				<NcButton variant="secondary" @click="editing = true">
@@ -35,8 +35,10 @@
 					:pending="pending"
 					:playlist-id="data.playlist.id"
 					:removable="!imported"
+					:page-size="pageSize"
+					:total="data.videos.total"
 					@remove="removeVideo" />
-				<Pagination :page="page" :total="data.videos.total" @change="goTo" />
+				<Pagination :page="page" :total="data.videos.total" :per-page="pageSize" @change="goTo" />
 			</template>
 			<NcEmptyContent v-else :name="t('No videos')" :description="imported ? data.message : t('Add a video to this playlist.')">
 				<template #icon>
@@ -78,6 +80,7 @@ import PlaybackDialog from '../components/PlaybackDialog.vue'
 import UrlDialog from '../components/UrlDialog.vue'
 import VideoGrid from '../components/VideoGrid.vue'
 import { useAsync } from '../composables/useAsync.js'
+import { usePagedGrid } from '../composables/usePagedGrid.js'
 import { confirm } from '../dialogs.js'
 import { entityTitle } from '../format.js'
 import { t } from '../i18n.js'
@@ -87,14 +90,16 @@ const route = useRoute()
 const router = useRouter()
 const editing = ref(false)
 const adding = ref(false)
-const page = computed(() => Number(route.query.page || 1))
+const pageElement = ref(null)
+const { pageSize, page, goTo, settle } = usePagedGrid(pageElement)
 
 const { data, loading, error, reload } = useAsync(async () => {
-	if (route.name !== 'playlist') {
+	if (route.name !== 'playlist' || !pageSize.value) {
 		return null
 	}
 	const playlist = await request(`api/playlists/${route.params.id}`)
-	const videos = await request(`api/catalog?playlist_id=${playlist.id}&page=${page.value}`)
+	const videos = await request(`api/catalog?playlist_id=${playlist.id}&page=${page.value}&page_size=${pageSize.value}`)
+	settle(videos.total)
 	let message = ''
 	if (!videos.items.length && playlist.kind === 'youtube') {
 		const schedule = await request('api/schedule')
@@ -102,15 +107,11 @@ const { data, loading, error, reload } = useAsync(async () => {
 		message = t('Videos will appear after the next batch, in about {minutes} min.', { minutes: Math.max(1, Math.ceil(delay / 60)) })
 	}
 	return { playlist, videos, message }
-}, () => [route.name, route.params.id, route.query.page])
+}, () => [route.name, route.params.id, route.query.page, pageSize.value])
 
 const title = computed(() => (data.value ? entityTitle(data.value.playlist, 'playlist') : ''))
 const imported = computed(() => data.value?.playlist.kind === 'youtube')
 const pending = computed(() => data.value?.videos.pending_jobs || [])
-
-function goTo(value) {
-	router.push({ query: { ...route.query, page: value } })
-}
 
 async function addVideo(url) {
 	try {

@@ -65,6 +65,10 @@ def test_video_pagination_is_fixed_to_ten(repository: Repository) -> None:
     assert len(second["items"]) == 2
     assert first["total"] == 12
 
+    wide = repository.videos("alice", page=2, page_size=5)
+    assert wide["page_size"] == 5
+    assert len(wide["items"]) == 5
+
 
 def test_pending_videos_share_the_fixed_page_size(repository: Repository) -> None:
     for index in range(12):

@@ -1,5 +1,5 @@
 <template>
-	<div class="lucarne-page">
+	<div ref="pageElement" class="lucarne-page">
 		<PageHeader :title="title">
 			<NcButton v-if="route.name === 'home'" variant="primary" @click="adding = true">
 				<template #icon>
@@ -29,8 +29,8 @@
 				</template>
 			</NcEmptyContent>
 			<template v-else>
-				<VideoGrid :videos="data.items" :pending="data.pending_jobs || []" />
-				<Pagination :page="page" :total="data.total" @change="goTo" />
+				<VideoGrid :videos="data.items" :pending="data.pending_jobs || []" :page-size="pageSize" :total="data.total" />
+				<Pagination :page="page" :total="data.total" :per-page="pageSize" @change="goTo" />
 			</template>
 		</template>
 		<UrlDialog
@@ -48,7 +48,7 @@ import NcButton from '@nextcloud/vue/components/NcButton'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import { computed, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import AlertCircleIcon from 'vue-material-design-icons/AlertCircle.vue'
 import PlusIcon from 'vue-material-design-icons/Plus.vue'
 import VideoOutlineIcon from 'vue-material-design-icons/VideoOutline.vue'
@@ -58,15 +58,16 @@ import Pagination from '../components/Pagination.vue'
 import UrlDialog from '../components/UrlDialog.vue'
 import VideoGrid from '../components/VideoGrid.vue'
 import { useAsync } from '../composables/useAsync.js'
+import { usePagedGrid } from '../composables/usePagedGrid.js'
 import { t } from '../i18n.js'
 import { notify, notifyError } from '../notify.js'
 import { state } from '../store.js'
 
 const route = useRoute()
-const router = useRouter()
 const adding = ref(false)
 
-const page = computed(() => Number(route.query.page || 1))
+const pageElement = ref(null)
+const { pageSize, page, goTo, settle } = usePagedGrid(pageElement)
 const search = computed(() => String(route.query.search || ''))
 const searched = computed(() => Boolean(search.value))
 
@@ -79,18 +80,21 @@ const title = computed(() => {
 })
 
 const { data, loading, error, reload } = useAsync(() => {
-	if (!['home', 'catalog', 'uncategorized'].includes(String(route.name))) {
+	if (!['home', 'catalog', 'uncategorized'].includes(String(route.name)) || !pageSize.value) {
 		return Promise.resolve(null)
 	}
-	const query = new URLSearchParams({ page: page.value, search: search.value })
+	const query = new URLSearchParams({ page: page.value, page_size: pageSize.value, search: search.value })
 	if (route.name === 'catalog') {
 		query.set('catalog_id', route.params.id)
 	}
 	if (route.name === 'uncategorized') {
 		query.set('uncategorized', 'true')
 	}
-	return request(`api/catalog?${query}`)
-}, () => [route.name, route.params.id, route.query.page, route.query.search])
+	return request(`api/catalog?${query}`).then((result) => {
+		settle(result.total)
+		return result
+	})
+}, () => [route.name, route.params.id, route.query.page, route.query.search, pageSize.value])
 
 const isEmpty = computed(() => !data.value.items.length && !(data.value.pending_jobs || []).length)
 const emptyTitle = computed(() => (route.name === 'home' && !searched.value ? t('No videos yet') : t('No videos')))
@@ -106,10 +110,6 @@ const emptyDescription = computed(() => {
 	}
 	return t('Add a channel, playlist or video to start your library.')
 })
-
-function goTo(value) {
-	router.push({ query: { ...route.query, page: value } })
-}
 
 async function addVideo(url) {
 	try {

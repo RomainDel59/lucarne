@@ -1,14 +1,11 @@
 <template>
 	<nav v-if="total > perPage" class="lucarne-pagination">
-		<NcButton variant="tertiary" :disabled="page <= 1" @click="$emit('change', page - 1)">
+		<NcButton variant="tertiary" :aria-label="t('Previous page')" :disabled="page <= 1" @click="$emit('change', page - 1)">
 			<template #icon>
 				<ChevronLeftIcon :size="20" />
 			</template>
-			{{ t('Previous page') }}
 		</NcButton>
-		<span>{{ t('Page {page}', { page }) }}</span>
-		<NcButton variant="tertiary" :disabled="page * perPage >= total" @click="$emit('change', page + 1)">
-			{{ t('Next page') }}
+		<NcButton variant="tertiary" :aria-label="t('Next page')" :disabled="page * perPage >= total" @click="$emit('change', page + 1)">
 			<template #icon>
 				<ChevronRightIcon :size="20" />
 			</template>
@@ -25,7 +22,7 @@ import { t } from '../i18n.js'
 defineProps({
 	page: { type: Number, required: true },
 	total: { type: Number, required: true },
-	perPage: { type: Number, default: 10 },
+	perPage: { type: Number, required: true },
 })
 defineEmits(['change'])
 </script>

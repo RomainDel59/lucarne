@@ -1,5 +1,5 @@
 <template>
-	<div class="lucarne-page">
+	<div ref="pageElement" class="lucarne-page">
 		<PageHeader :title="title">
 			<template v-if="data">
 				<template v-if="data.channel.subscribed">
@@ -32,8 +32,8 @@
 		</NcEmptyContent>
 		<template v-else-if="data">
 			<template v-if="data.videos.items.length">
-				<VideoGrid :videos="data.videos.items" />
-				<Pagination :page="page" :total="data.videos.total" @change="goTo" />
+				<VideoGrid :videos="data.videos.items" :page-size="pageSize" :total="data.videos.total" />
+				<Pagination :page="page" :total="data.videos.total" :per-page="pageSize" @change="goTo" />
 			</template>
 			<NcEmptyContent
 				v-else
@@ -70,6 +70,7 @@ import Pagination from '../components/Pagination.vue'
 import PlaybackDialog from '../components/PlaybackDialog.vue'
 import VideoGrid from '../components/VideoGrid.vue'
 import { useAsync } from '../composables/useAsync.js'
+import { usePagedGrid } from '../composables/usePagedGrid.js'
 import { confirm } from '../dialogs.js'
 import { entityTitle } from '../format.js'
 import { t } from '../i18n.js'
@@ -78,14 +79,16 @@ import { notify, notifyError } from '../notify.js'
 const route = useRoute()
 const router = useRouter()
 const editing = ref(false)
-const page = computed(() => Number(route.query.page || 1))
+const pageElement = ref(null)
+const { pageSize, page, goTo, settle } = usePagedGrid(pageElement)
 
 const { data, loading, error, reload } = useAsync(async () => {
-	if (route.name !== 'channel') {
+	if (route.name !== 'channel' || !pageSize.value) {
 		return null
 	}
 	const channel = await request(`api/channels/${route.params.id}`)
-	const videos = await request(`api/catalog?channel_id=${channel.id}&page=${page.value}`)
+	const videos = await request(`api/catalog?channel_id=${channel.id}&page=${page.value}&page_size=${pageSize.value}`)
+	settle(videos.total)
 	let message = ''
 	if (!videos.items.length && channel.sync_status !== 'error') {
 		const schedule = await request('api/schedule')
@@ -93,7 +96,7 @@ const { data, loading, error, reload } = useAsync(async () => {
 		message = t('Videos will appear after the next batch, in about {minutes} min.', { minutes: Math.max(1, Math.ceil(delay / 60)) })
 	}
 	return { channel, videos, message }
-}, () => [route.name, route.params.id, route.query.page])
+}, () => [route.name, route.params.id, route.query.page, pageSize.value])
 
 const title = computed(() => (data.value ? entityTitle(data.value.channel, 'channel') : ''))
 const emptyDescription = computed(() => (
@@ -101,10 +104,6 @@ const emptyDescription = computed(() => (
 		? data.value.channel.sync_error || t('The agent will retry this source in a future batch.')
 		: data.value.message
 ))
-
-function goTo(value) {
-	router.push({ query: { ...route.query, page: value } })
-}
 
 async function subscribe() {
 	const channel = data.value.channel

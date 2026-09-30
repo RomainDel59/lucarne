@@ -177,6 +177,7 @@ async def bootstrap(request: Request, nc: Annotated[AsyncNextcloudApp, Depends(a
 async def get_catalog(
     nc: Annotated[AsyncNextcloudApp, Depends(anc_app)],
     page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
     channel_id: int | None = None,
     playlist_id: int | None = None,
     catalog_id: int | None = None,
@@ -193,11 +194,11 @@ async def get_catalog(
         else:
             pending = repository.pending_video_jobs(uid)
     data = repository.videos(
-        uid, page, channel_id, playlist_id, catalog_id, uncategorized, search, pending_count=len(pending)
+        uid, page, channel_id, playlist_id, catalog_id, uncategorized, search, pending_count=len(pending), page_size=page_size
     )
     data["items"] = [present_video(item) for item in data["items"]]
-    offset = (page - 1) * 10
-    data["pending_jobs"] = pending[offset : offset + 10]
+    offset = (page - 1) * page_size
+    data["pending_jobs"] = pending[offset : offset + page_size]
     return data
 
 
@@ -452,9 +453,11 @@ async def delete_catalog(catalog_id: int, nc: Annotated[AsyncNextcloudApp, Depen
 
 @APP.get("/api/history")
 async def get_history(
-    nc: Annotated[AsyncNextcloudApp, Depends(anc_app)], page: int = Query(default=1, ge=1)
+    nc: Annotated[AsyncNextcloudApp, Depends(anc_app)],
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
 ) -> dict[str, Any]:
-    result = repository.history(user_id(nc), page)
+    result = repository.history(user_id(nc), page, page_size)
     result["items"] = [present_video(item) for item in result["items"]]
     return result
 
