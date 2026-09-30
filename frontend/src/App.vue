@@ -25,7 +25,7 @@
 					</NcAppNavigationItem>
 					<NcAppNavigationItem :name="t('Uncatalogued')" :to="{ name: 'uncategorized' }">
 						<template #icon>
-							<FolderOutlineIcon :size="20" />
+							<FolderOffOutlineIcon :size="20" />
 						</template>
 					</NcAppNavigationItem>
 				</NcAppNavigationItem>
@@ -99,6 +99,7 @@ import AlertCircleIcon from 'vue-material-design-icons/AlertCircle.vue'
 import ChartTimelineVariantIcon from 'vue-material-design-icons/ChartTimelineVariant.vue'
 import CogIcon from 'vue-material-design-icons/Cog.vue'
 import FolderMultipleOutlineIcon from 'vue-material-design-icons/FolderMultipleOutline.vue'
+import FolderOffOutlineIcon from 'vue-material-design-icons/FolderOffOutline.vue'
 import FolderOutlineIcon from 'vue-material-design-icons/FolderOutline.vue'
 import HistoryIcon from 'vue-material-design-icons/History.vue'
 import HomeIcon from 'vue-material-design-icons/Home.vue'
