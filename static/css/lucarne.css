@@ -19,26 +19,26 @@
 .lucarne-navigation__brand svg { color: var(--lucarne-primary); }
 .lucarne-nav-list { display: grid; gap: 4px; }
 .lucarne-nav-separator { height: 1px; margin: 8px 16px; background: var(--lucarne-border); }
-.lucarne-nav-item { display: flex; align-items: center; min-width: 0; gap: 14px; height: 48px; padding: 0 16px; border: 0; border-radius: 24px; color: inherit; background: transparent; text-align: left; cursor: pointer; }
-.lucarne-nav-item:hover { background: var(--lucarne-hover); }
-.lucarne-nav-item[aria-current="page"] { color: var(--lucarne-primary); background: color-mix(in srgb, var(--lucarne-primary) 16%, transparent); font-weight: 650; }
-.lucarne-nav-item--catalog { height: 40px; padding-left: 42px; font-size: 13px; }
-.lucarne-nav-item span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.lucarne-nav-item:not(.button-vue) { display: flex; align-items: center; min-width: 0; gap: 14px; height: 48px; padding: 0 16px; border: 0; border-radius: 24px; color: inherit; background: transparent; text-align: left; cursor: pointer; }
+button.lucarne-nav-item:not(.button-vue):hover { background: var(--lucarne-hover); }
+button.lucarne-nav-item:not(.button-vue)[aria-current="page"] { color: var(--lucarne-primary); background: color-mix(in srgb, var(--lucarne-primary) 16%, transparent); font-weight: 650; }
+button.lucarne-nav-item--catalog:not(.button-vue) { height: 40px; padding-left: 42px; font-size: 13px; }
+button.lucarne-nav-item:not(.button-vue) span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lucarne-main { flex: 1 1 auto; min-width: 0; overflow: auto; }
 .lucarne-page { width: 100%; min-height: 100%; margin: 0; padding: 24px clamp(18px, 3vw, 48px) 56px; }
 .lucarne-page-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 48px; margin-bottom: 24px; }
 .lucarne-page-header h1 { min-width: 0; margin: 0; overflow: hidden; color: inherit; font-size: clamp(24px, 3vw, 32px); font-weight: 500; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
 .lucarne-page-actions { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; gap: 8px; }
-.lucarne-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 18px; border: 0; border-radius: 20px; font: inherit; font-weight: 600; cursor: pointer; }
-.lucarne-button--filled { color: var(--lucarne-primary-text); background: var(--lucarne-primary); }
-.lucarne-button--tonal { color: var(--lucarne-primary); background: color-mix(in srgb, var(--lucarne-primary) 14%, transparent); }
-.lucarne-button--text { color: var(--lucarne-primary); background: transparent; }
-.lucarne-button--danger { color: var(--lucarne-danger); background: transparent; }
-.lucarne-button:hover { filter: brightness(.96); }
-.lucarne-icon-button { display: inline-grid; width: 40px; height: 40px; padding: 0; place-items: center; border: 0; border-radius: 50%; color: inherit; background: transparent; cursor: pointer; }
-.lucarne-icon-button:hover { background: var(--lucarne-hover); }
-.lucarne-menu-button { display: none; }
-.lucarne-scrim { position: fixed; z-index: 40; inset: 0; padding: 0; border: 0; background: rgb(12 18 28 / 52%); }
+button.lucarne-button:not(.button-vue) { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 18px; border: 0; border-radius: 20px; font: inherit; font-weight: 600; cursor: pointer; }
+button.lucarne-button--filled:not(.button-vue) { color: var(--lucarne-primary-text); background: var(--lucarne-primary); }
+button.lucarne-button--tonal:not(.button-vue) { color: var(--lucarne-primary); background: color-mix(in srgb, var(--lucarne-primary) 14%, transparent); }
+button.lucarne-button--text:not(.button-vue) { color: var(--lucarne-primary); background: transparent; }
+button.lucarne-button--danger:not(.button-vue) { color: var(--lucarne-danger); background: transparent; }
+button.lucarne-button:not(.button-vue):hover { filter: brightness(.96); }
+button.lucarne-icon-button:not(.button-vue) { display: inline-grid; width: 40px; height: 40px; padding: 0; place-items: center; border: 0; border-radius: 50%; color: inherit; background: transparent; cursor: pointer; }
+button.lucarne-icon-button:not(.button-vue):hover { background: var(--lucarne-hover); }
+button.lucarne-menu-button:not(.button-vue) { display: none; }
+button.lucarne-scrim:not(.button-vue) { position: fixed; z-index: 40; inset: 0; padding: 0; border: 0; background: rgb(12 18 28 / 52%); }
 .lucarne-icon { width: 22px; height: 22px; flex: 0 0 auto; fill: currentColor; }
 .lucarne-input, .lucarne-select { box-sizing: border-box; width: 100%; min-height: 48px; padding: 10px 14px; border: 1px solid var(--lucarne-border); border-radius: 12px; color: var(--lucarne-text); background: var(--lucarne-surface); font: inherit; }
 .lucarne-search { width: min(420px, 40vw); }
@@ -55,9 +55,9 @@
 .lucarne-video-card__title { display: -webkit-box; overflow: hidden; font-weight: 650; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .lucarne-video-card__meta { display: flex; min-width: 0; gap: 5px; margin-top: auto; padding-top: 10px; color: var(--lucarne-muted); font-size: 13px; white-space: nowrap; }
 .lucarne-video-card__meta span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.lucarne-card-remove { position: absolute; right: 8px; bottom: 8px; color: var(--lucarne-danger); background: var(--lucarne-surface); box-shadow: var(--lucarne-shadow); }
+button.lucarne-card-remove:not(.button-vue) { position: absolute; right: 8px; bottom: 8px; color: var(--lucarne-danger); background: var(--lucarne-surface); box-shadow: var(--lucarne-shadow); }
 .lucarne-entity-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: 16px; }
-.lucarne-entity-card { display: flex; min-width: 0; align-items: center; gap: 16px; padding: 16px; border: 0; border-radius: var(--lucarne-radius); color: inherit; background: var(--lucarne-surface); box-shadow: var(--lucarne-shadow); text-align: left; cursor: pointer; transition: transform 150ms ease, box-shadow 150ms ease; }
+button.lucarne-entity-card:not(.button-vue) { display: flex; min-width: 0; align-items: center; gap: 16px; padding: 16px; border: 0; border-radius: var(--lucarne-radius); color: inherit; background: var(--lucarne-surface); box-shadow: var(--lucarne-shadow); text-align: left; cursor: pointer; transition: transform 150ms ease, box-shadow 150ms ease; }
 .lucarne-entity-card__image { display: grid; width: 72px; height: 72px; flex: 0 0 72px; overflow: hidden; place-items: center; border-radius: 50%; color: var(--lucarne-primary); background: var(--lucarne-surface-variant); }
 .lucarne-entity-card--playlist .lucarne-entity-card__image { border-radius: 14px; }
 .lucarne-entity-card__image img { width: 100%; height: 100%; object-fit: cover; transition: transform 180ms ease; }
@@ -124,7 +124,7 @@
 @media (max-width: 900px) {
   .lucarne-navigation { position: fixed; top: 0; bottom: 0; left: 0; width: min(310px, calc(100vw - 48px)); transform: translateX(-105%); box-shadow: 8px 0 30px rgb(0 0 0 / 20%); transition: transform 180ms ease; }
   .lucarne-navigation--open { transform: translateX(0); }
-  .lucarne-menu-button { display: inline-grid; flex: 0 0 auto; }
+  button.lucarne-menu-button:not(.button-vue) { display: inline-grid; flex: 0 0 auto; }
   .lucarne-page-header { flex-wrap: wrap; }
   .lucarne-page-header h1 { flex: 1 1 0; }
   .lucarne-page-actions { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
