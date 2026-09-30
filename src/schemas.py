@@ -60,7 +60,7 @@ class PersonalSettingsRequest(BaseModel):
 
 
 class InstanceSettingsRequest(BaseModel):
-    batch_size: int = Field(ge=5, le=50)
+    batch_size: int = Field(ge=1, le=50)
     lot_wait_seconds: int
     campaign_duration_seconds: int
     temporary_retention_days: int = Field(ge=1, le=365)

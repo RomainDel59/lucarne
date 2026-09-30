@@ -228,6 +228,15 @@ def test_instance_settings_accept_only_supported_schedules(repository: Repositor
         )
 
 
+def test_batch_size_accepts_one_video_and_rejects_the_extremes(repository: Repository) -> None:
+    values = {"lot_wait_seconds": 300, "campaign_duration_seconds": 7200, "temporary_retention_days": 7}
+    assert repository.update_instance_settings({**values, "batch_size": 1})["batch_size"] == 1
+
+    for invalid in (0, 51):
+        with pytest.raises(ValueError, match="batch size"):
+            repository.update_instance_settings({**values, "batch_size": invalid})
+
+
 def test_upload_date_is_used_when_youtube_has_no_timestamp(repository: Repository) -> None:
     video = repository.store_video(
         "alice",

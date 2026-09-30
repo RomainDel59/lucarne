@@ -15,7 +15,7 @@
 				<NcTextField
 					v-model="form.batch_size"
 					type="number"
-					min="5"
+					min="1"
 					max="50"
 					required
 					:label="t('Videos per batch')"

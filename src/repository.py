@@ -97,8 +97,8 @@ class Repository:
         lot_wait = int(values.get("lot_wait_seconds", 300))
         duration = int(values.get("campaign_duration_seconds", 7200))
         retention = int(values.get("temporary_retention_days", 7))
-        if not 5 <= batch_size <= 50:
-            raise ValueError("The batch size must be between 5 and 50.")
+        if not 1 <= batch_size <= 50:
+            raise ValueError("The batch size must be between 1 and 50.")
         if lot_wait not in {60, 120, 300, 600, 900, 1800, 3600}:
             raise ValueError("The delay between batches is invalid.")
         if duration not in {1800, 3600, 7200, 14400, 28800, 43200}:

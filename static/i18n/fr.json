@@ -212,7 +212,6 @@
   "Each source will be selected from local data and the remaining campaign time.": "Chaque source sera choisie selon les données locales et le temps restant.",
   "{count} known videos · unlimited": "{count} vidéos connues · aucune limite",
   "{count} known videos · limit {limit}": "{count} vidéos connues · limite de {limit}",
-  "The batch size must be between 5 and 50.": "La taille des lots doit être comprise entre 5 et 50.",
   "The delay between batches is invalid.": "Le délai entre les lots est invalide.",
   "The campaign duration is invalid.": "La durée de la campagne est invalide.",
   "Agent batch not found.": "Lot de l’agent introuvable.",
