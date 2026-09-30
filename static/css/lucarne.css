@@ -104,7 +104,7 @@ button.lucarne-entity-card:not(.button-vue) { display: flex; min-width: 0; align
 .lucarne-dialog__body { display: grid; gap: 16px; overflow: auto; padding: 16px 24px; }
 .lucarne-dialog footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px 20px; }
 .lucarne-switch { display: inline-flex; align-items: center; gap: 8px; }
-.lucarne-switch input { width: 42px; height: 24px; accent-color: var(--lucarne-primary); }
+.lucarne-switch input[type="checkbox"]:not(.button-vue) { flex: 0 0 auto; width: 20px; min-width: 0; height: 20px; min-height: 0; margin: 0; padding: 0; accent-color: var(--lucarne-primary); cursor: pointer; }
 .lucarne-transfer { display: grid; margin-top: 16px; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 14px; align-items: start; }
 .lucarne-transfer__buttons { display: grid; gap: 8px; padding-top: 38px; }
 .lucarne-agent-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-bottom: 20px; }
