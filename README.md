@@ -1,3 +1,5 @@
+🇬🇧 **English** | [🇫🇷 Français](docs/translations/README.fr.md)
+
 # Lucarne
 
 Lucarne is a focused, private YouTube library for Nextcloud. It follows channels, imports playlists, organizes subscriptions into catalogues, and plays media from a calm interface without requiring a YouTube account.
