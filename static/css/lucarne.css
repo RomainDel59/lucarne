@@ -128,8 +128,8 @@ button.lucarne-entity-card:not(.button-vue) { display: flex; min-width: 0; align
 
 @media (max-width: 900px) {
   button.lucarne-scrim:not(.button-vue) { top: var(--header-height, 50px); }
-  .lucarne-navigation { position: fixed; top: var(--header-height, 50px); bottom: 0; left: 0; width: min(310px, calc(100vw - 48px)); transform: translateX(-105%); box-shadow: 8px 0 30px rgb(0 0 0 / 20%); transition: transform 180ms ease; }
-  .lucarne-navigation--open { transform: translateX(0); }
+  .lucarne-navigation { position: fixed; top: var(--header-height, 50px); bottom: 0; left: 0; width: min(310px, calc(100vw - 48px)); transform: translateX(-105%); transition: transform 180ms ease; }
+  .lucarne-navigation--open { transform: translateX(0); box-shadow: 8px 0 30px rgb(0 0 0 / 20%); }
   .lucarne-navigation { background: var(--lucarne-surface); }
   button.lucarne-menu-button:not(.button-vue) { display: inline-grid; flex: 0 0 auto; }
   .lucarne-page-header { flex-wrap: wrap; }
