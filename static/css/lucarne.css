@@ -68,7 +68,7 @@
 .lucarne-status { display: block; margin-top: 5px; color: var(--lucarne-primary); font-size: 12px; font-weight: 650; }
 .lucarne-status--error { color: var(--lucarne-danger); }
 .lucarne-empty { display: grid; min-height: 360px; place-items: center; text-align: center; color: var(--lucarne-muted); }
-.lucarne-empty svg { width: 64px; height: 64px; margin-bottom: 14px; color: var(--lucarne-primary); }
+.lucarne-empty > div > svg { width: 64px; height: 64px; margin-bottom: 14px; color: var(--lucarne-primary); }
 .lucarne-pagination { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 32px; }
 .lucarne-player-shell { position: relative; display: grid; width: 100%; min-height: min(56vw, 720px); max-height: min(72vh, 820px); overflow: hidden; place-items: center; border-radius: var(--lucarne-radius); color: #fff; background: #000; box-shadow: var(--lucarne-shadow); }
 .lucarne-player-shell > img { width: 100%; height: 100%; object-fit: contain; }
