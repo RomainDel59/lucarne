@@ -22,3 +22,7 @@ data/
 *.key
 *.pem
 logs/
+
+# Front-end build output (see frontend/)
+static/js/lucarne-main.js
+static/css/lucarne.css

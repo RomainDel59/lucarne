@@ -1,0 +1,30 @@
+{
+  "name": "lucarne-frontend",
+  "version": "1.0.1",
+  "private": true,
+  "description": "Lucarne web interface built with Nextcloud Vue components",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch --mode development"
+  },
+  "engines": {
+    "node": "^20.11.0 || ^22 || ^24"
+  },
+  "dependencies": {
+    "@nextcloud/dialogs": "7.5.0",
+    "@nextcloud/files": "4.1.0",
+    "@nextcloud/l10n": "3.4.1",
+    "@nextcloud/router": "3.2.0",
+    "@nextcloud/vue": "9.13.0",
+    "vue": "3.5.43",
+    "vue-material-design-icons": "5.3.1",
+    "vue-router": "5.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.9",
+    "sass-embedded": "^1.105.1",
+    "vite": "^8.3.1"
+  }
+}

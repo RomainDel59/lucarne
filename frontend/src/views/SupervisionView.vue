@@ -1,0 +1,174 @@
+<template>
+	<div class="lucarne-page">
+		<PageHeader :title="t('Supervision')" />
+		<NcLoadingIcon v-if="!data && !failure" :size="44" />
+		<NcEmptyContent v-else-if="failure" :name="t('Something went wrong')" :description="failure">
+			<template #icon>
+				<AlertCircleIcon />
+			</template>
+		</NcEmptyContent>
+		<NcSettingsSection
+			v-else
+			:name="t('Agent')"
+			:description="t('Real-time campaign and batch supervision.')">
+			<ul class="lucarne-agent">
+				<NcListItem
+					:name="running ? t('Current batch') : t('Next batch in')"
+					:details="running ? t('In progress') : countdown(seconds)" />
+				<NcListItem
+					:name="running ? t('Current operation') : t('Next operation')"
+					:details="operation" />
+				<li v-if="!data.jobs.length" class="lucarne-agent__empty">
+					{{ t('No queued batches.') }}
+				</li>
+				<template v-for="job in data.jobs" :key="job.id">
+					<NcListItem
+						:name="jobTitle(job)"
+						:details="`${technicalLabel(`status.${job.status}`)} · ${job.manual ? t('User request') : t('Automatic')}`"
+						force-display-actions>
+						<template #subname>
+							{{ job.error || presentationText(job.presentation?.summary) }}
+						</template>
+						<template #actions>
+							<NcActionButton
+								v-if="job.status === 'queued'"
+								:disabled="queued.indexOf(job) === 0"
+								@click="alter(job, 'move', { direction: 'up' })">
+								<template #icon>
+									<ArrowUpIcon :size="20" />
+								</template>
+								{{ t('Move up') }}
+							</NcActionButton>
+							<NcActionButton
+								v-if="job.status === 'queued'"
+								:disabled="queued.indexOf(job) === queued.length - 1"
+								@click="alter(job, 'move', { direction: 'down' })">
+								<template #icon>
+									<ArrowDownIcon :size="20" />
+								</template>
+								{{ t('Move down') }}
+							</NcActionButton>
+							<NcActionButton v-if="job.status === 'error'" @click="alter(job, 'retry')">
+								<template #icon>
+									<RefreshIcon :size="20" />
+								</template>
+								{{ t('Retry') }}
+							</NcActionButton>
+							<NcActionButton v-if="job.status !== 'running'" @click="alter(job, 'delete')">
+								<template #icon>
+									<DeleteIcon :size="20" />
+								</template>
+								{{ t('Delete') }}
+							</NcActionButton>
+						</template>
+					</NcListItem>
+					<li v-if="job.presentation?.details?.length" class="lucarne-agent__details">
+						<details>
+							<summary>{{ t('Show details ({count})', { count: job.presentation.details.length }) }}</summary>
+							<ul>
+								<li v-for="line in job.presentation.details" :key="line">
+									{{ presentationText(line) }}
+								</li>
+							</ul>
+						</details>
+					</li>
+				</template>
+				<NcListItem
+					v-for="step in data.future_steps || []"
+					:key="step.title"
+					:name="t(step.title)"
+					:details="t('Future step')">
+					<template #subname>
+						{{ t(step.summary) }}
+					</template>
+				</NcListItem>
+			</ul>
+		</NcSettingsSection>
+	</div>
+</template>
+
+<script setup>
+import NcActionButton from '@nextcloud/vue/components/NcActionButton'
+import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
+import NcListItem from '@nextcloud/vue/components/NcListItem'
+import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
+import NcSettingsSection from '@nextcloud/vue/components/NcSettingsSection'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import AlertCircleIcon from 'vue-material-design-icons/AlertCircle.vue'
+import ArrowDownIcon from 'vue-material-design-icons/ArrowDown.vue'
+import ArrowUpIcon from 'vue-material-design-icons/ArrowUp.vue'
+import DeleteIcon from 'vue-material-design-icons/Delete.vue'
+import RefreshIcon from 'vue-material-design-icons/Refresh.vue'
+import { request, send } from '../api.js'
+import PageHeader from '../components/PageHeader.vue'
+import { countdown } from '../format.js'
+import { t } from '../i18n.js'
+import { presentationText, technicalLabel } from '../labels.js'
+import { notifyError } from '../notify.js'
+
+const data = ref(null)
+const failure = ref('')
+let timer = null
+
+const seconds = computed(() => Math.max(0, Number(data.value.campaign.next_lot_at) - Number(data.value.server_time)))
+const running = computed(() => data.value.jobs.find((job) => job.status === 'running'))
+const queued = computed(() => data.value.jobs.filter((job) => job.status === 'queued'))
+const operation = computed(() => {
+	const presentation = (running.value || queued.value[0])?.presentation
+	return presentation
+		? presentationText(presentation.title, presentation.variables)
+		: technicalLabel(`phase.${data.value.campaign.phase || 'discover'}`)
+})
+
+function jobTitle(job) {
+	const presentation = job.presentation || {}
+	return presentation.title ? presentationText(presentation.title, presentation.variables) : technicalLabel(`job.${job.type}`)
+}
+
+async function refresh() {
+	try {
+		data.value = await request('api/agent')
+		failure.value = ''
+	} catch (error) {
+		failure.value = error.message
+	}
+}
+
+async function alter(job, action, body = {}) {
+	try {
+		if (action === 'delete') {
+			await request(`api/agent/jobs/${job.id}`, { method: 'DELETE' })
+		} else {
+			await send('POST', `api/agent/jobs/${job.id}/${action}`, body)
+		}
+		await refresh()
+	} catch (error) {
+		notifyError(error)
+	}
+}
+
+onMounted(() => {
+	refresh()
+	timer = setInterval(refresh, 1000)
+})
+onBeforeUnmount(() => clearInterval(timer))
+</script>
+
+<style scoped>
+.lucarne-agent {
+	display: flex;
+	flex-direction: column;
+	gap: var(--default-grid-baseline);
+	max-width: 900px;
+}
+
+.lucarne-agent__empty {
+	padding: calc(var(--default-grid-baseline) * 2) calc(var(--default-grid-baseline) * 3);
+	color: var(--color-text-maxcontrast);
+}
+
+.lucarne-agent__details {
+	padding-inline: calc(var(--default-grid-baseline) * 3);
+	color: var(--color-text-maxcontrast);
+}
+</style>
