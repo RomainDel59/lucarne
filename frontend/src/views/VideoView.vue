@@ -339,6 +339,8 @@ async function deleteVideo() {
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	/* An explicit width keeps the frame full width when the height is capped. */
+	width: 100%;
 	aspect-ratio: 16 / 9;
 	max-height: var(--lucarne-player-max-height);
 	overflow: hidden;
