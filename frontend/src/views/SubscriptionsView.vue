@@ -1,5 +1,5 @@
 <template>
-	<div class="lucarne-page">
+	<div ref="pageElement" class="lucarne-page">
 		<PageHeader :title="t('Subscriptions')">
 			<SelectField
 				v-model="catalog"
@@ -25,9 +25,7 @@
 			</template>
 		</NcEmptyContent>
 		<template v-else-if="data">
-			<ul v-if="channels.length" class="lucarne-list">
-				<EntityListItem v-for="channel in channels" :key="channel.id" :item="channel" type="channel" />
-			</ul>
+			<EntityGrid v-if="channels.length" :items="channels" type="channel" :page="page" :page-size="pageSize" @change="goTo" />
 			<NcEmptyContent v-else :name="t('No subscriptions')" :description="t('Add a YouTube channel to follow its videos.')">
 				<template #icon>
 					<YoutubeSubscriptionIcon />
@@ -48,17 +46,18 @@
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AlertCircleIcon from 'vue-material-design-icons/AlertCircle.vue'
 import PlusIcon from 'vue-material-design-icons/Plus.vue'
 import YoutubeSubscriptionIcon from 'vue-material-design-icons/YoutubeSubscription.vue'
 import { request, send } from '../api.js'
-import EntityListItem from '../components/EntityListItem.vue'
+import EntityGrid from '../components/EntityGrid.vue'
 import PageHeader from '../components/PageHeader.vue'
 import SelectField from '../components/SelectField.vue'
 import UrlDialog from '../components/UrlDialog.vue'
 import { useAsync } from '../composables/useAsync.js'
+import { usePagedGrid } from '../composables/usePagedGrid.js'
 import { t } from '../i18n.js'
 import { notify, notifyError } from '../notify.js'
 import { state } from '../store.js'
@@ -66,14 +65,17 @@ import { state } from '../store.js'
 const route = useRoute()
 const router = useRouter()
 const adding = ref(false)
+const pageElement = ref(null)
+// Compact tiles: six rows take about the height of two rows of video tiles.
+const { pageSize, page, goTo, settle } = usePagedGrid(pageElement, 6)
 
 const catalog = computed({
 	get: () => String(route.query.catalog || 'all'),
-	set: (value) => router.replace({ query: { ...route.query, catalog: value === 'all' ? undefined : value } }),
+	set: (value) => router.replace({ query: { ...route.query, page: undefined, catalog: value === 'all' ? undefined : value } }),
 })
 const sort = computed({
 	get: () => String(route.query.sort || 'alpha'),
-	set: (value) => router.replace({ query: { ...route.query, sort: value === 'alpha' ? undefined : value } }),
+	set: (value) => router.replace({ query: { ...route.query, page: undefined, sort: value === 'alpha' ? undefined : value } }),
 })
 
 const catalogOptions = computed(() => [
@@ -102,6 +104,8 @@ const channels = computed(() => {
 	return list
 })
 
+watch(() => [pageSize.value, channels.value.length], () => settle(channels.value.length))
+
 async function addChannel(url) {
 	try {
 		await send('POST', 'api/channels', { url })
@@ -113,10 +117,3 @@ async function addChannel(url) {
 }
 </script>
 
-<style scoped>
-.lucarne-list {
-	display: flex;
-	flex-direction: column;
-	gap: var(--default-grid-baseline);
-}
-</style>

@@ -1,5 +1,5 @@
 <template>
-	<div class="lucarne-page">
+	<div ref="pageElement" class="lucarne-page">
 		<PageHeader :title="t('Playlists')">
 			<SelectField
 				v-model="sort"
@@ -20,9 +20,7 @@
 			</template>
 		</NcEmptyContent>
 		<template v-else-if="data">
-			<ul v-if="playlists.length" class="lucarne-list">
-				<EntityListItem v-for="playlist in playlists" :key="playlist.id" :item="playlist" type="playlist" />
-			</ul>
+			<EntityGrid v-if="playlists.length" :items="playlists" type="playlist" :page="page" :page-size="pageSize" @change="goTo" />
 			<NcEmptyContent v-else :name="t('No playlists')" :description="t('Create a personal playlist or import one from YouTube.')">
 				<template #icon>
 					<PlaylistPlayIcon />
@@ -37,26 +35,30 @@
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AlertCircleIcon from 'vue-material-design-icons/AlertCircle.vue'
 import PlaylistPlayIcon from 'vue-material-design-icons/PlaylistPlay.vue'
 import PlusIcon from 'vue-material-design-icons/Plus.vue'
 import { request } from '../api.js'
 import AddPlaylistDialog from '../components/AddPlaylistDialog.vue'
-import EntityListItem from '../components/EntityListItem.vue'
+import EntityGrid from '../components/EntityGrid.vue'
 import PageHeader from '../components/PageHeader.vue'
 import SelectField from '../components/SelectField.vue'
 import { useAsync } from '../composables/useAsync.js'
+import { usePagedGrid } from '../composables/usePagedGrid.js'
 import { t } from '../i18n.js'
 
 const route = useRoute()
 const router = useRouter()
 const adding = ref(false)
+const pageElement = ref(null)
+// Compact tiles: six rows take about the height of two rows of video tiles.
+const { pageSize, page, goTo, settle } = usePagedGrid(pageElement, 6)
 
 const sort = computed({
 	get: () => String(route.query.sort || 'alpha'),
-	set: (value) => router.replace({ query: { ...route.query, sort: value === 'alpha' ? undefined : value } }),
+	set: (value) => router.replace({ query: { ...route.query, page: undefined, sort: value === 'alpha' ? undefined : value } }),
 })
 const sortOptions = [
 	{ id: 'alpha', label: t('Alphabetical order') },
@@ -75,12 +77,6 @@ const playlists = computed(() => {
 	}
 	return list
 })
+watch(() => [pageSize.value, playlists.value.length], () => settle(playlists.value.length))
 </script>
 
-<style scoped>
-.lucarne-list {
-	display: flex;
-	flex-direction: column;
-	gap: var(--default-grid-baseline);
-}
-</style>

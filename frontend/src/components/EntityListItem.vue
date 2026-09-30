@@ -1,5 +1,8 @@
 <template>
 	<NcListItem :name="title" :to="to" :details="status">
+		<template #name>
+			<span :title="title">{{ title }}</span>
+		</template>
 		<template #icon>
 			<NcAvatar
 				:url="imageUrl"
