@@ -2,11 +2,12 @@
 
 All notable changes to Lucarne are documented in this file.
 
-## Unreleased
+## 1.2.0
 
 - Follow each user's Nextcloud language and locale for the interface, error messages, and dates, instead of the browser's.
 - Fetch YouTube titles and descriptions in a language chosen by the administrator (English or French) instead of always in French. It is initialized from the Nextcloud language of the first administrator, and English is used until an administrator opens Lucarne.
 - Prepare the store listing: clearer summary and description, identifiable author, documentation link, screenshots, and a third-party services notice in the README.
+- Upgrading from 1.1.0 migrates the database automatically (schema version 3).
 
 ## 1.1.0
 

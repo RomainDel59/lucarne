@@ -78,7 +78,7 @@ async def lifespan(app: FastAPI):
     media.stop()
 
 
-APP = FastAPI(title="Lucarne", version="1.1.0", lifespan=lifespan, docs_url=None, redoc_url=None)
+APP = FastAPI(title="Lucarne", version="1.2.0", lifespan=lifespan, docs_url=None, redoc_url=None)
 APP.add_middleware(AppAPIAuthMiddleware)
 for static_directory in ("js", "css", "img"):
     APP.mount(
