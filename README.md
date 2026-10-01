@@ -6,6 +6,22 @@ Lucarne is a focused, private YouTube library for Nextcloud. It follows channels
 
 Lucarne is a Nextcloud AppAPI external application. Its API, catalogue agent, media downloader, database, and web interface run in one container. AppAPI provides an isolated persistent volume for the SQLite database, cached images, temporary downloads, and retained media.
 
+## Requirements
+
+- Nextcloud 35 or 36
+- AppAPI with a working HaRP deploy daemon
+- A host supported by AppAPI container deployment
+
+## Installation
+
+Register the latest release (v1.1.0) with AppAPI, using the `appinfo/info.xml` of its tag. Replace `<daemon>` with the name of your HaRP deploy daemon:
+
+```sh
+php occ app_api:app:register lucarne <daemon> --info-xml https://raw.githubusercontent.com/RomainDel59/lucarne/v1.1.0/appinfo/info.xml --wait-finish
+```
+
+AppAPI then pulls and starts the matching container image automatically.
+
 ## Features
 
 - Chronological video pages showing two complete rows per page, with icon-only previous and next buttons
@@ -19,17 +35,9 @@ Lucarne is a Nextcloud AppAPI external application. Its API, catalogue agent, me
 - English source language and bundled French localization
 - Multi-user isolation from the first stored record
 
-## Requirements
+## Running a development version
 
-- Nextcloud 35 or 36
-- AppAPI with a working HaRP deploy daemon
-- A host supported by AppAPI container deployment
-
-## Installation
-
-For a published release, install Lucarne from the Nextcloud Apps administration page. AppAPI pulls and starts the matching container image automatically.
-
-For local development, build the image and register `appinfo/info.xml` with an AppAPI development deploy daemon:
+Build the image and register `appinfo/info.xml` with an AppAPI development deploy daemon:
 
 ```sh
 docker build -t ghcr.io/romaindel59/lucarne:dev .

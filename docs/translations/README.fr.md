@@ -6,6 +6,22 @@ Lucarne est une vidéothèque YouTube privée et sobre pour Nextcloud. Elle suit
 
 Lucarne est une application externe AppAPI de Nextcloud. Son API, son agent de catalogues, son téléchargeur de médias, sa base de données et son interface web tournent dans un seul conteneur. AppAPI fournit un volume persistant isolé pour la base SQLite, les images en cache, les téléchargements temporaires et les médias conservés.
 
+## Prérequis
+
+- Nextcloud 35 ou 36
+- AppAPI avec un démon de déploiement HaRP fonctionnel
+- Un hôte pris en charge par le déploiement de conteneurs AppAPI
+
+## Installation
+
+Enregistrez la dernière version publiée (v1.1.0) auprès d'AppAPI, avec le fichier `appinfo/info.xml` de son tag. Remplacez `<démon>` par le nom de votre démon de déploiement HaRP :
+
+```sh
+php occ app_api:app:register lucarne <démon> --info-xml https://raw.githubusercontent.com/RomainDel59/lucarne/v1.1.0/appinfo/info.xml --wait-finish
+```
+
+AppAPI télécharge et démarre ensuite automatiquement l'image de conteneur correspondante.
+
 ## Fonctionnalités
 
 - Pages de vidéos chronologiques affichant deux rangées complètes par page, avec des boutons précédent et suivant en icônes seules
@@ -19,17 +35,9 @@ Lucarne est une application externe AppAPI de Nextcloud. Son API, son agent de c
 - Anglais comme langue source et traduction française incluse
 - Isolation multi-utilisateur dès le premier enregistrement
 
-## Prérequis
+## Exécuter une version de développement
 
-- Nextcloud 35 ou 36
-- AppAPI avec un démon de déploiement HaRP fonctionnel
-- Un hôte pris en charge par le déploiement de conteneurs AppAPI
-
-## Installation
-
-Pour une version publiée, installez Lucarne depuis la page d'administration des applications de Nextcloud. AppAPI télécharge et démarre automatiquement l'image de conteneur correspondante.
-
-Pour le développement local, construisez l'image et enregistrez `appinfo/info.xml` auprès d'un démon de déploiement AppAPI de développement :
+Construisez l'image et enregistrez `appinfo/info.xml` auprès d'un démon de déploiement AppAPI de développement :
 
 ```sh
 docker build -t ghcr.io/romaindel59/lucarne:dev .
