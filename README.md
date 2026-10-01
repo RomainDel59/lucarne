@@ -6,6 +6,10 @@ Lucarne is a focused, private YouTube library for Nextcloud. It follows channels
 
 Lucarne is a Nextcloud AppAPI external application. Its API, catalogue agent, media downloader, database, and web interface run in one container. AppAPI provides an isolated persistent volume for the SQLite database, cached images, temporary downloads, and retained media.
 
+![Lucarne home page: a grid of recent videos](docs/screenshot-home.png)
+
+![Lucarne subscriptions page: channels with their video count and latest date](docs/screenshot-subscriptions.png)
+
 ## Requirements
 
 - Nextcloud 35 or 36
