@@ -1,9 +1,11 @@
 """Repository and isolation tests."""
 
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
+from src.database import SCHEMA_VERSION, Database
 from src.repository import Repository
 
 
@@ -251,3 +253,28 @@ def test_upload_date_is_used_when_youtube_has_no_timestamp(repository: Repositor
     expected = int(datetime(2026, 9, 28, 12, tzinfo=UTC).timestamp())
     assert video["published_at"] == expected
     assert video["availability_checked_at"] is not None
+
+
+def test_user_language_defaults_to_english_and_is_remembered(repository: Repository) -> None:
+    assert repository.user_language("alice") == "en"
+
+    repository.remember_language("alice", "fr")
+    repository.remember_language("bob", "pt-BR")
+
+    assert repository.user_language("alice") == "fr"
+    assert repository.user_language("bob") == "pt-BR"
+    assert repository.personal_settings("alice")["language"] == "fr"
+
+
+def test_a_database_without_the_language_column_is_upgraded(tmp_path: Path) -> None:
+    database = Database(tmp_path / "old.db")
+    database.initialize()
+    with database.write() as connection:
+        connection.execute("INSERT INTO user_settings(user_id, created_at, updated_at) VALUES ('alice', 1, 1)")
+        connection.execute("ALTER TABLE user_settings DROP COLUMN language")
+        connection.execute("UPDATE schema_meta SET version=2")
+
+    database.initialize()
+
+    assert Repository(database).user_language("alice") == "en"
+    assert (database.one("SELECT version FROM schema_meta") or {})["version"] == SCHEMA_VERSION

@@ -65,6 +65,20 @@ class Repository:
             )
         return self.db.one("SELECT * FROM user_settings WHERE user_id = ?", (user_id,)) or {}
 
+    def user_language(self, user_id: str) -> str:
+        """Return the language the user's YouTube metadata is fetched in."""
+        row = self.db.one("SELECT language FROM user_settings WHERE user_id = ?", (user_id,))
+        return str(row["language"]) if row else "en"
+
+    def remember_language(self, user_id: str, language: str) -> None:
+        """Store the user's language so background work can use it without a request."""
+        if self.personal_settings(user_id).get("language") == language:
+            return
+        with self.db.write() as connection:
+            connection.execute(
+                "UPDATE user_settings SET language = ?, updated_at = ? WHERE user_id = ?", (language, now(), user_id)
+            )
+
     def update_personal_settings(self, user_id: str, values: dict[str, Any]) -> dict[str, Any]:
         self.personal_settings(user_id)
         mode = str(values.get("default_mode", "video"))

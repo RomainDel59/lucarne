@@ -1,5 +1,5 @@
 import { generateUrl } from '@nextcloud/router'
-import { t } from './i18n.js'
+import { nextcloudLanguage, t } from './i18n.js'
 
 const PROXY_ROOT = '/apps/app_api/proxy/lucarne/'
 
@@ -11,7 +11,7 @@ export async function request(path, options = {}) {
 	const { headers, ...rest } = options
 	const response = await fetch(apiUrl(path), {
 		credentials: 'same-origin',
-		headers: { 'Content-Type': 'application/json', ...(headers || {}) },
+		headers: { 'Content-Type': 'application/json', 'Accept-Language': nextcloudLanguage(), ...(headers || {}) },
 		...rest,
 	})
 	const body = response.status === 204 ? null : await response.json().catch(() => ({}))

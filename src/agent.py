@@ -268,11 +268,12 @@ class Agent:
 
     def _initialize_channel(self, user_id: str, channel_id: int) -> None:
         channel = self.repository.channel(user_id, channel_id)
-        data = self.youtube.discover(str(channel["source_url"]), "channel", 1, 1)
+        language = self.repository.user_language(user_id)
+        data = self.youtube.discover(str(channel["source_url"]), "channel", 1, 1, language)
         entries = data["entries"]
         if not entries:
             raise LucarneError("This channel does not contain any usable videos.")
-        details, unavailable = self.youtube.inspect_batch([entries[0]["id"]])
+        details, unavailable = self.youtube.inspect_batch([entries[0]["id"]], language)
         metadata = details[0] if details else {}
         external_id = data.get("id") or metadata.get("channel_id") or metadata.get("uploader_id")
         if not external_id:
@@ -290,20 +291,22 @@ class Agent:
 
     def _initialize_playlist(self, user_id: str, playlist_id: int) -> None:
         playlist = self.repository.playlist(user_id, playlist_id)
-        data = self.youtube.discover(str(playlist["source_url"]), "playlist", 1, 1)
+        language = self.repository.user_language(user_id)
+        data = self.youtube.discover(str(playlist["source_url"]), "playlist", 1, 1, language)
         entries = data["entries"]
         if not entries:
             raise LucarneError("This playlist does not contain any usable videos.")
         self._update_source(user_id, "playlist", playlist_id, data)
         if entries:
-            details, unavailable = self.youtube.inspect_batch([entries[0]["id"]])
+            details, unavailable = self.youtube.inspect_batch([entries[0]["id"]], language)
             for metadata in details:
                 video = self._store_metadata(user_id, metadata)
                 self.repository.attach_video(user_id, playlist_id, int(video["id"]))
             self._mark_unavailable(user_id, unavailable)
 
     def _inspect_single_video(self, user_id: str, url: str, playlist_id: int | None) -> None:
-        video = self._store_metadata(user_id, self.youtube.inspect_video(url))
+        language = self.repository.user_language(user_id)
+        video = self._store_metadata(user_id, self.youtube.inspect_video(url, language))
         if playlist_id:
             self.repository.attach_video(user_id, int(playlist_id), int(video["id"]))
 
@@ -314,7 +317,11 @@ class Agent:
             else self.repository.playlist(user_id, source_id)
         )
         data = self.youtube.discover(
-            str(source["source_url"]), source_type, 1, int(self.repository.instance_settings()["batch_size"])
+            str(source["source_url"]),
+            source_type,
+            1,
+            int(self.repository.instance_settings()["batch_size"]),
+            self.repository.user_language(user_id),
         )
         self._update_source(user_id, source_type, source_id, data)
         local_priority = self._local_source_priority(user_id, source_type, source_id)
@@ -358,7 +365,9 @@ class Agent:
         )
         if not candidates:
             return
-        details, unavailable = self.youtube.inspect_batch([str(item["youtube_id"]) for item in candidates])
+        details, unavailable = self.youtube.inspect_batch(
+            [str(item["youtube_id"]) for item in candidates], self.repository.user_language(user_id)
+        )
         by_id = {str(item["id"]): item for item in details}
         for candidate in candidates:
             metadata = by_id.get(str(candidate["youtube_id"]))
@@ -422,8 +431,9 @@ class Agent:
         if limit <= 0:
             return
         start = int(source["catalog_offset"]) + 1
-        data = self.youtube.discover(str(source["source_url"]), source_type, start, limit)
-        details, unavailable = self.youtube.inspect_batch([str(item["id"]) for item in data["entries"]])
+        language = self.repository.user_language(user_id)
+        data = self.youtube.discover(str(source["source_url"]), source_type, start, limit, language)
+        details, unavailable = self.youtube.inspect_batch([str(item["id"]) for item in data["entries"]], language)
         for metadata in details:
             video = self._store_metadata(user_id, metadata, int(source["id"]) if source_type == "channel" else None)
             if source_type == "playlist":

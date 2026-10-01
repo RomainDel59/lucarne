@@ -3,8 +3,11 @@
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from src.agent import Agent
 from src.database import Database
+from src.errors import LucarneError
 from src.repository import Repository, now
 
 
@@ -92,7 +95,7 @@ def test_metadata_candidates_are_planned_in_configured_batches(
 
 
 class InitializationYouTube:
-    def discover(self, value: str, source_type: str, start: int, count: int) -> dict:
+    def discover(self, value: str, source_type: str, start: int, count: int, language: str) -> dict:
         assert start == 1
         assert count == 1
         return {
@@ -106,7 +109,7 @@ class InitializationYouTube:
             "image_url": None,
         }
 
-    def inspect_batch(self, video_ids: list[str]) -> tuple[list[dict], list[str]]:
+    def inspect_batch(self, video_ids: list[str], language: str) -> tuple[list[dict], list[str]]:
         assert video_ids == ["video12345"]
         return (
             [
@@ -176,3 +179,23 @@ def test_thumbnail_falls_back_to_youtube_standard_image(
         "https://i.ytimg.com/vi/abc123DEF45/hqdefault.jpg",
     ]
     assert video["thumbnail_file"].endswith("-fallback.jpg")
+
+
+def test_youtube_is_queried_in_the_language_of_the_user(
+    database: Database, repository: Repository, tmp_path: Path
+) -> None:
+    languages: list[str] = []
+
+    def discover(url: str, source_type: str, start: int, count: int, language: str) -> dict:
+        languages.append(language)
+        return {"entries": []}
+
+    channel = repository.create_channel("alice", "https://www.youtube.com/@alice/videos")
+    repository.remember_language("alice", "de")
+    agent = make_agent(database, repository, tmp_path)
+    agent.youtube = SimpleNamespace(discover=discover)
+
+    with pytest.raises(LucarneError):
+        agent._initialize_channel("alice", int(channel["id"]))
+
+    assert languages == ["de"]

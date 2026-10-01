@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 SCHEMA = """
@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
     default_quality TEXT NOT NULL DEFAULT '720',
     default_audio_quality TEXT NOT NULL DEFAULT '128',
     history_limit INTEGER NOT NULL DEFAULT 0,
+    language TEXT NOT NULL DEFAULT 'en',
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 );
@@ -229,15 +230,22 @@ class Database:
             row = connection.execute("SELECT version FROM schema_meta LIMIT 1").fetchone()
             if row is None:
                 connection.execute("INSERT INTO schema_meta(version) VALUES (?)", (SCHEMA_VERSION,))
-            elif int(row["version"]) == 1:
-                connection.execute("ALTER TABLE channels ADD COLUMN subscribed INTEGER NOT NULL DEFAULT 1")
-                connection.execute("ALTER TABLE videos ADD COLUMN unavailable_reason TEXT")
-                connection.execute("ALTER TABLE videos ADD COLUMN availability_checked_at INTEGER")
-                connection.execute("ALTER TABLE videos ADD COLUMN deleting INTEGER NOT NULL DEFAULT 0")
-                connection.execute("ALTER TABLE candidates ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'")
-                connection.execute("UPDATE schema_meta SET version=?", (SCHEMA_VERSION,))
-            elif int(row["version"]) != SCHEMA_VERSION:
-                raise RuntimeError(f"Unsupported database schema version: {row['version']}")
+            else:
+                version = int(row["version"])
+                if version == 1:
+                    connection.execute("ALTER TABLE channels ADD COLUMN subscribed INTEGER NOT NULL DEFAULT 1")
+                    connection.execute("ALTER TABLE videos ADD COLUMN unavailable_reason TEXT")
+                    connection.execute("ALTER TABLE videos ADD COLUMN availability_checked_at INTEGER")
+                    connection.execute("ALTER TABLE videos ADD COLUMN deleting INTEGER NOT NULL DEFAULT 0")
+                    connection.execute("ALTER TABLE candidates ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'")
+                    version = 2
+                if version == 2:
+                    connection.execute("ALTER TABLE user_settings ADD COLUMN language TEXT NOT NULL DEFAULT 'en'")
+                    version = 3
+                if version != SCHEMA_VERSION:
+                    raise RuntimeError(f"Unsupported database schema version: {row['version']}")
+                if int(row["version"]) != SCHEMA_VERSION:
+                    connection.execute("UPDATE schema_meta SET version=?", (SCHEMA_VERSION,))
 
     def connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=30, check_same_thread=False)

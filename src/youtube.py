@@ -18,6 +18,7 @@ VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{6,32}$")
 PLAYLIST_ID = re.compile(r"^[A-Za-z0-9_-]{10,128}$")
 CHANNEL_PATH = re.compile(r"^/(?:@[^/]+|channel/[A-Za-z0-9_-]+|c/[^/]+|user/[^/]+)(?:/videos)?$")
 ALLOWED_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com"}
+METADATA_LANGUAGE = re.compile(r"[a-z]{2,3}(?:-[A-Z]{2})?")
 UNAVAILABLE_MARKERS = (
     "video unavailable",
     "private video",
@@ -95,7 +96,7 @@ class YouTubeClient:
     def __init__(self, executable: str = "yt-dlp") -> None:
         self.executable = executable
 
-    def run(self, arguments: list[str], timeout: int = 300) -> str:
+    def run(self, arguments: list[str], timeout: int = 300, language: str | None = None) -> str:
         environment = os.environ.copy()
         environment.setdefault("LANG", "C.UTF-8")
         try:
@@ -106,8 +107,7 @@ class YouTubeClient:
                     "--no-cache-dir",
                     "--js-runtimes",
                     "deno",
-                    "--extractor-args",
-                    "youtube:lang=fr",
+                    *self._language_arguments(language),
                     *arguments,
                 ],
                 check=False,
@@ -125,9 +125,16 @@ class YouTubeClient:
             raise LucarneError(detail)
         return result.stdout
 
-    def inspect_video(self, value: str) -> dict[str, Any]:
+    @staticmethod
+    def _language_arguments(language: str | None) -> list[str]:
+        """Ask YouTube for metadata in the given language; anything unexpected is ignored."""
+        if language and METADATA_LANGUAGE.fullmatch(language):
+            return ["--extractor-args", f"youtube:lang={language}"]
+        return []
+
+    def inspect_video(self, value: str, language: str = "en") -> dict[str, Any]:
         url = normalize_video_url(value)
-        output = self.run(["--no-warnings", "--no-playlist", "--dump-single-json", url], 180)
+        output = self.run(["--no-warnings", "--no-playlist", "--dump-single-json", url], 180, language)
         try:
             data = json.loads(output)
         except json.JSONDecodeError as error:
@@ -136,7 +143,9 @@ class YouTubeClient:
             raise LucarneError("The video does not expose usable metadata.")
         return data
 
-    def discover(self, value: str, source_type: str, start: int, count: int) -> dict[str, Any]:
+    def discover(
+        self, value: str, source_type: str, start: int, count: int, language: str = "en"
+    ) -> dict[str, Any]:
         if not 1 <= count <= 50 or start < 1:
             raise LucarneError("Invalid catalogue range.")
         url = normalize_channel_url(value) if source_type == "channel" else normalize_playlist_url(value)
@@ -150,7 +159,8 @@ class YouTubeClient:
                 f"{start}:{end}",
                 "--dump-single-json",
                 url,
-            ]
+            ],
+            language=language,
         )
         try:
             data = json.loads(output)
@@ -177,7 +187,9 @@ class YouTubeClient:
             "image_url": self._image_url(data, source_type == "channel"),
         }
 
-    def inspect_batch(self, video_ids: list[str]) -> tuple[list[dict[str, Any]], list[str]]:
+    def inspect_batch(
+        self, video_ids: list[str], language: str = "en"
+    ) -> tuple[list[dict[str, Any]], list[str]]:
         if len(video_ids) > 50:
             raise LucarneError("A batch cannot contain more than 50 videos.")
         entries: list[dict[str, Any]] = []
@@ -186,7 +198,7 @@ class YouTubeClient:
             if not VIDEO_ID.fullmatch(video_id):
                 continue
             try:
-                entries.append(self.inspect_video(f"https://www.youtube.com/watch?v={video_id}"))
+                entries.append(self.inspect_video(f"https://www.youtube.com/watch?v={video_id}", language))
             except VideoUnavailableError:
                 unavailable.append(video_id)
             if index + 1 < len(video_ids):

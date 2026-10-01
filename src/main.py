@@ -20,7 +20,7 @@ from .agent import Agent
 from .config import settings
 from .database import Database
 from .errors import ConflictError, LucarneError, NotFoundError
-from .localization import catalog, language_from_header, translate
+from .localization import catalog, language_from_header, metadata_language_from_header, translate
 from .media import MediaService
 from .repository import Repository
 from .schemas import (
@@ -162,7 +162,9 @@ async def bootstrap(request: Request, nc: Annotated[AsyncNextcloudApp, Depends(a
         is_admin = "admin" in current_user.groups
     except Exception:
         is_admin = False
-    language = language_from_header(request.headers.get("accept-language"))
+    accepted = request.headers.get("accept-language")
+    language = language_from_header(accepted)
+    repository.remember_language(uid, metadata_language_from_header(accepted))
     return {
         "user_id": uid,
         "is_admin": is_admin,

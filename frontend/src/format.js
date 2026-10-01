@@ -1,10 +1,11 @@
-import { i18n, t } from './i18n.js'
+import { getCanonicalLocale } from '@nextcloud/l10n'
+import { t } from './i18n.js'
 
 export function formatDate(timestamp) {
 	if (!timestamp) {
 		return t('Unknown date')
 	}
-	return new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(new Date(timestamp * 1000))
+	return new Intl.DateTimeFormat(getCanonicalLocale(), { dateStyle: 'medium' }).format(new Date(timestamp * 1000))
 }
 
 export function formatDuration(value) {

@@ -1,10 +1,19 @@
 """YouTube input boundary tests."""
 
+import subprocess
+from types import SimpleNamespace
+
 import pytest
 
 from src.assets import ALLOWED_IMAGE_HOSTS
 from src.errors import LucarneError
-from src.youtube import normalize_channel_url, normalize_playlist_url, normalize_video_url, quality_format
+from src.youtube import (
+    YouTubeClient,
+    normalize_channel_url,
+    normalize_playlist_url,
+    normalize_video_url,
+    quality_format,
+)
 
 
 def test_normalize_channel_url() -> None:
@@ -52,3 +61,30 @@ def test_audio_quality_of_64_kbps_is_supported() -> None:
 
 def test_both_youtube_channel_image_hosts_are_allowed() -> None:
     assert {"yt3.ggpht.com", "yt3.googleusercontent.com"} <= ALLOWED_IMAGE_HOSTS
+
+
+def captured_command(monkeypatch: pytest.MonkeyPatch, **options: str | None) -> list[str]:
+    commands: list[list[str]] = []
+
+    def fake_run(command: list[str], **_: object) -> SimpleNamespace:
+        commands.append(command)
+        return SimpleNamespace(returncode=0, stdout="{}", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    YouTubeClient().run(["--dump-single-json", "https://www.youtube.com/watch?v=abcdefghijk"], **options)
+    return commands[0]
+
+
+def test_metadata_is_requested_in_the_given_language(monkeypatch: pytest.MonkeyPatch) -> None:
+    command = captured_command(monkeypatch, language="de")
+
+    assert command[command.index("--extractor-args") + 1] == "youtube:lang=de"
+
+
+def test_no_language_is_forced_when_none_is_given(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert "--extractor-args" not in captured_command(monkeypatch)
+
+
+@pytest.mark.parametrize("value", ["", "fr; --exec", "--exec", "FR", "fr-fr", "français"])
+def test_an_unexpected_language_is_never_passed_to_yt_dlp(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    assert "--extractor-args" not in captured_command(monkeypatch, language=value)
