@@ -18,10 +18,10 @@ Lucarne est une application externe AppAPI de Nextcloud. Son API, son agent de c
 
 ## Installation
 
-Enregistrez la dernière version publiée (v1.1.0) auprès d'AppAPI, avec le fichier `appinfo/info.xml` de son tag. Remplacez `<démon>` par le nom de votre démon de déploiement HaRP :
+Enregistrez la dernière version publiée (v1.2.0) auprès d'AppAPI, avec le fichier `appinfo/info.xml` de son tag. Remplacez `<démon>` par le nom de votre démon de déploiement HaRP :
 
 ```sh
-php occ app_api:app:register lucarne <démon> --info-xml https://raw.githubusercontent.com/RomainDel59/lucarne/v1.1.0/appinfo/info.xml --wait-finish
+php occ app_api:app:register lucarne <démon> --info-xml https://raw.githubusercontent.com/RomainDel59/lucarne/v1.2.0/appinfo/info.xml --wait-finish
 ```
 
 AppAPI télécharge et démarre ensuite automatiquement l'image de conteneur correspondante.
