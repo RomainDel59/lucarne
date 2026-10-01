@@ -22,6 +22,9 @@ php occ app_api:app:register lucarne <daemon> --info-xml https://raw.githubuserc
 
 AppAPI then pulls and starts the matching container image automatically.
 
+The image contains Python, FastAPI, `yt-dlp` with its EJS challenge solver, Deno, FFmpeg, the compiled web interface, and the HaRP FRP client. No extra worker container or database is required.
+
+
 ## Features
 
 - Chronological video pages showing two complete rows per page, with icon-only previous and next buttons
@@ -34,18 +37,6 @@ AppAPI then pulls and starts the matching container image automatically.
 - Interface built with Nextcloud components, following the light, dark, or custom theme of each user
 - English source language and bundled French localization
 - Multi-user isolation from the first stored record
-
-## Running a development version
-
-Build the image and register `appinfo/info.xml` with an AppAPI development deploy daemon:
-
-```sh
-docker build -t ghcr.io/romaindel59/lucarne:dev .
-```
-
-The image contains Python, FastAPI, `yt-dlp` with its EJS challenge solver, Deno, FFmpeg, the compiled web interface, and the HaRP FRP client. No extra worker container or database is required.
-
-To try Lucarne in a disposable Nextcloud, follow "Try Lucarne in a local Nextcloud" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Data layout
 
@@ -62,45 +53,9 @@ library/
 
 Back up the AppAPI volume with the same policy used for other application data. The container image itself is disposable.
 
-## Development
+## Contributing
 
-Create a Python 3.12 environment and install the development dependencies:
-
-```sh
-python -m venv .venv
-. .venv/bin/activate
-pip install -r requirements-dev.txt
-pytest
-ruff check src tests
-```
-
-Validate a production-like build with:
-
-```sh
-docker build --pull -t lucarne:test .
-docker run --rm --entrypoint python lucarne:test -m compileall -q /app/src
-```
-
-The web client is a Vue application built with the same Nextcloud components as the Files app (`@nextcloud/vue`), so it follows whichever theme is applied in Nextcloud. Its sources are in `frontend/`. The Docker build compiles them into a single script and stylesheet, `static/js/lucarne-main.js` and `static/css/lucarne.css`, served through the authenticated AppAPI proxy. These two generated files are not committed; to build them outside Docker, use Node.js 20.11 or later:
-
-```sh
-cd frontend
-npm ci
-npm run build
-```
-
-The front-end libraries are pinned to the versions used by Nextcloud 35.
-
-## Localization
-
-English strings are the source strings, written as `t('English text')` in the web interface. Runtime web translations live in `static/i18n/<language>.json`, where `en.json` is empty because English needs no translation; Nextcloud application metadata translations live in `l10n/`.
-
-When adding a language:
-
-1. Copy `static/i18n/fr.json` to the new locale name.
-2. Translate every value without changing the keys or placeholders such as `{count}`.
-3. Add the matching Nextcloud `l10n/<language>.json` and `.js` files.
-4. Add the language code to `SUPPORTED_LANGUAGES` in `src/localization.py`.
+The development setup, checks, local Nextcloud environment, and the steps to add a language are described in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Security model
 

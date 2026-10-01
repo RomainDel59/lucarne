@@ -14,22 +14,42 @@ Thank you for improving Lucarne.
 
 ## Checks
 
+Create a Python 3.12 environment and install the development dependencies:
+
+```sh
+python -m venv .venv
+. .venv/bin/activate
+pip install -r requirements-dev.txt
+```
+
 Run before opening a pull request:
 
 ```sh
 ruff check src tests
 pytest
 (cd frontend && npm ci && npm run build)
-docker build -t lucarne:test .
+docker build --pull -t lucarne:test .
+docker run --rm --entrypoint python lucarne:test -m compileall -q /app/src
 ```
 
 Keep changes focused and explain any storage or API compatibility impact in the pull request.
 
 ## Web interface
 
-The interface is a Vue 3 application in `frontend/`, built with Vite into `static/js/lucarne-main.js` and `static/css/lucarne.css`. These two generated files are not committed. Run `npm run build` in `frontend/` to produce them for a local run, or `npm run dev` to rebuild on every change. The Docker image builds them itself.
+The interface is a Vue 3 application in `frontend/`, built with Vite into `static/js/lucarne-main.js` and `static/css/lucarne.css`. These two generated files are not committed. Run `npm run build` in `frontend/` to produce them for a local run, or `npm run dev` to rebuild on every change. The Docker image builds them itself. Building them outside Docker requires Node.js 20.11 or later.
 
 Keep `@nextcloud/vue` and the related libraries on the versions used by the Nextcloud release you target, so the interface looks exactly like the other apps. Every translatable string is written as `t('English text')` and must exist in `static/i18n/fr.json`; a test checks it.
+
+## Localization
+
+English strings are the source strings, written as `t('English text')` in the web interface. Runtime web translations live in `static/i18n/<language>.json`, where `en.json` is empty because English needs no translation; Nextcloud application metadata translations live in `l10n/`.
+
+When adding a language:
+
+1. Copy `static/i18n/fr.json` to the new locale name.
+2. Translate every value without changing the keys or placeholders such as `{count}`.
+3. Add the matching Nextcloud `l10n/<language>.json` and `.js` files.
+4. Add the language code to `SUPPORTED_LANGUAGES` in `src/localization.py`.
 
 ## Try Lucarne in a local Nextcloud
 
