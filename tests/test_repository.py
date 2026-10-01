@@ -1,9 +1,11 @@
 """Repository and isolation tests."""
 
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
+from src.database import SCHEMA_VERSION, Database
 from src.repository import Repository
 
 
@@ -251,3 +253,43 @@ def test_upload_date_is_used_when_youtube_has_no_timestamp(repository: Repositor
     expected = int(datetime(2026, 9, 28, 12, tzinfo=UTC).timestamp())
     assert video["published_at"] == expected
     assert video["availability_checked_at"] is not None
+
+
+def test_metadata_language_is_english_until_one_is_set(repository: Repository) -> None:
+    assert repository.metadata_language() == "en"
+    assert not repository.has_metadata_language()
+
+
+def test_metadata_language_is_initialized_once_and_never_overrides_the_administrator(repository: Repository) -> None:
+    repository.set_metadata_language_if_unset("fr")
+    repository.set_metadata_language_if_unset("en")
+
+    assert repository.has_metadata_language()
+    assert repository.metadata_language() == "fr"
+
+
+def test_the_administrator_chooses_the_metadata_language(repository: Repository) -> None:
+    repository.set_metadata_language_if_unset("fr")
+
+    assert repository.update_instance_settings({"metadata_language": "en"})["metadata_language"] == "en"
+    assert repository.update_instance_settings({"batch_size": 5})["metadata_language"] == "en"
+    with pytest.raises(ValueError, match="not supported"):
+        repository.update_instance_settings({"metadata_language": "de"})
+    with pytest.raises(ValueError, match="not supported"):
+        repository.set_metadata_language_if_unset("de")
+
+
+def test_a_database_without_the_metadata_language_is_upgraded(tmp_path: Path) -> None:
+    database = Database(tmp_path / "old.db")
+    database.initialize()
+    with database.write() as connection:
+        connection.execute("INSERT INTO instance_settings(singleton, updated_at) VALUES (1, 1)")
+        connection.execute("ALTER TABLE instance_settings DROP COLUMN metadata_language")
+        connection.execute("UPDATE schema_meta SET version=2")
+
+    database.initialize()
+
+    repository = Repository(database)
+    assert not repository.has_metadata_language()
+    assert repository.metadata_language() == "en"
+    assert (database.one("SELECT version FROM schema_meta") or {})["version"] == SCHEMA_VERSION

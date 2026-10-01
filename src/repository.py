@@ -11,6 +11,7 @@ from urllib.parse import quote, urlsplit
 
 from .database import Database, placeholders
 from .errors import ConflictError, NotFoundError
+from .localization import SUPPORTED_LANGUAGES
 
 
 def now() -> int:
@@ -91,8 +92,30 @@ class Repository:
             connection.execute("INSERT OR IGNORE INTO instance_settings(singleton, updated_at) VALUES (1, ?)", (now(),))
         return self.db.one("SELECT * FROM instance_settings WHERE singleton = 1") or {}
 
-    def update_instance_settings(self, values: dict[str, Any]) -> dict[str, Any]:
+    def metadata_language(self) -> str:
+        """Return the language YouTube titles and descriptions are fetched in; English until one is set."""
+        return str(self.instance_settings()["metadata_language"] or "en")
+
+    def has_metadata_language(self) -> bool:
+        return self.instance_settings()["metadata_language"] is not None
+
+    def set_metadata_language_if_unset(self, language: str) -> None:
+        """Initialize the metadata language once, never overriding a value an administrator may have chosen."""
+        if language not in SUPPORTED_LANGUAGES:
+            raise ValueError("The YouTube metadata language is not supported.")
         self.instance_settings()
+        with self.db.write() as connection:
+            connection.execute(
+                "UPDATE instance_settings SET metadata_language = ?, updated_at = ? "
+                "WHERE singleton = 1 AND metadata_language IS NULL",
+                (language, now()),
+            )
+
+    def update_instance_settings(self, values: dict[str, Any]) -> dict[str, Any]:
+        current = self.instance_settings()
+        language = values.get("metadata_language") or current["metadata_language"]
+        if language is not None and language not in SUPPORTED_LANGUAGES:
+            raise ValueError("The YouTube metadata language is not supported.")
         batch_size = int(values.get("batch_size", 10))
         lot_wait = int(values.get("lot_wait_seconds", 300))
         duration = int(values.get("campaign_duration_seconds", 7200))
@@ -108,8 +131,9 @@ class Repository:
         with self.db.write() as connection:
             connection.execute(
                 """UPDATE instance_settings SET batch_size = ?, lot_wait_seconds = ?,
-                   campaign_duration_seconds = ?, temporary_retention_days = ?, updated_at = ? WHERE singleton = 1""",
-                (batch_size, lot_wait, duration, retention, now()),
+                   campaign_duration_seconds = ?, temporary_retention_days = ?, metadata_language = ?,
+                   updated_at = ? WHERE singleton = 1""",
+                (batch_size, lot_wait, duration, retention, language, now()),
             )
         return self.instance_settings()
 

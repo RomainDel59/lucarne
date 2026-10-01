@@ -64,3 +64,4 @@ class InstanceSettingsRequest(BaseModel):
     lot_wait_seconds: int
     campaign_duration_seconds: int
     temporary_retention_days: int = Field(ge=1, le=365)
+    metadata_language: str | None = None

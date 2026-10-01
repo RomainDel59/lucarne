@@ -12,6 +12,10 @@
 			:name="t('Collection agent')"
 			:description="t('Control the pace of automatic YouTube requests and temporary media retention.')">
 			<SectionForm :dirty="dirty" @submit="save" @cancel="reset">
+				<SelectField
+					v-model="form.metadata_language"
+					:options="languageOptions"
+					:label="t('Language of YouTube titles and descriptions')" />
 				<NcTextField
 					v-model="form.batch_size"
 					type="number"
@@ -51,12 +55,18 @@ import { t } from '../i18n.js'
 import { notify, notifyError } from '../notify.js'
 
 const form = reactive({
+	metadata_language: 'en',
 	batch_size: '10',
 	lot_wait_seconds: '300',
 	campaign_duration_seconds: '7200',
 	temporary_retention_days: '7',
 })
 
+// Language names are written in their own language, whatever the interface language.
+const languageOptions = [
+	{ id: 'en', label: 'English' },
+	{ id: 'fr', label: 'Français' },
+]
 const waitOptions = [
 	{ id: '60', label: t('1 minute') },
 	{ id: '120', label: t('2 minutes') },
@@ -91,7 +101,9 @@ const dirty = computed(() => Boolean(data.value) && Object.keys(form).some((key)
 
 async function save() {
 	try {
-		const values = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, Number(value)]))
+		const values = Object.fromEntries(
+			Object.entries(form).map(([key, value]) => [key, key === 'metadata_language' ? value : Number(value)]),
+		)
 		await send('PUT', 'api/admin/settings', values)
 		data.value = { ...data.value, ...values }
 		notify(t('Settings saved'))

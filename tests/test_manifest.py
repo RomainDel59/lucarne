@@ -35,3 +35,14 @@ def test_container_includes_the_youtube_challenge_runtime() -> None:
     assert "yt-dlp[default]" in requirements
     assert "deno-${archive_arch}-unknown-linux-gnu.zip" in dockerfile
     assert '"--js-runtimes",\n                    "deno"' in youtube
+
+
+def test_store_listing_screenshots_exist_in_the_repository() -> None:
+    root = Path(__file__).parents[1]
+    manifest = ElementTree.parse(root / "appinfo" / "info.xml").getroot()  # noqa: S314
+    screenshots = [item.text or "" for item in manifest.findall("screenshot")]
+
+    assert screenshots
+    for url in screenshots:
+        assert url.startswith("https://"), url
+        assert (root / "docs" / url.rsplit("/", 1)[1]).is_file(), url

@@ -19,6 +19,7 @@ def test_language_negotiation_uses_first_supported_language() -> None:
     assert language_from_header("de-DE, fr-FR;q=0.9, en;q=0.8") == "fr"
     assert language_from_header("en-US,en;q=0.9") == "en"
     assert language_from_header(None) == "en"
+    assert language_from_header("fr_FR") == "fr"
 
 
 def test_stable_errors_are_localized_but_unknown_details_are_preserved() -> None:

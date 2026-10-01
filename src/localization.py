@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
 
 APPLICATION_ROOT = Path(__file__).resolve().parent.parent
 SUPPORTED_LANGUAGES = {"en", "fr"}
+SEPARATOR = re.compile(r"[-_]")
 
 
 def language_from_header(header: str | None) -> str:
     """Return the best supported language from an Accept-Language header."""
     for preference in (header or "en").split(","):
-        language = preference.split(";", 1)[0].strip().split("-", 1)[0].lower()
+        language = SEPARATOR.split(preference.split(";", 1)[0].strip(), 1)[0].lower()
         if language in SUPPORTED_LANGUAGES:
             return language
     return "en"

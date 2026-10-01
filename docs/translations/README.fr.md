@@ -26,6 +26,8 @@ php occ app_api:app:register lucarne <démon> --info-xml https://raw.githubuserc
 
 AppAPI télécharge et démarre ensuite automatiquement l'image de conteneur correspondante.
 
+Une fois l'installation faite, un administrateur doit ouvrir Lucarne une première fois. La langue des titres et descriptions YouTube est un réglage unique de l'instance : elle est initialisée avec la langue Nextcloud du premier administrateur et se change dans Administration (anglais ou français). Tant qu'elle n'est pas initialisée, l'anglais est utilisé.
+
 L'image contient Python, FastAPI, `yt-dlp` avec son résolveur de défis EJS, Deno, FFmpeg, l'interface web compilée et le client FRP de HaRP. Aucun conteneur de traitement ni aucune base de données supplémentaire n'est nécessaire.
 
 
@@ -39,6 +41,7 @@ L'image contient Python, FastAPI, `yt-dlp` avec son résolveur de défis EJS, De
 - Conservation temporaire glissante des médias et conservation hors ligne optionnelle
 - Campagnes de catalogue persistantes et respectueuses des limites de débit, avec supervision visible des lots
 - Interface construite avec les composants Nextcloud, qui suit le thème clair, sombre ou personnalisé de chaque utilisateur
+- La langue de l'interface et les formats de date suivent les paramètres Nextcloud de chaque utilisateur ; la langue des titres et descriptions YouTube est un réglage d'administration
 - Anglais comme langue source et traduction française incluse
 - Isolation multi-utilisateur dès le premier enregistrement
 
@@ -71,6 +74,12 @@ L'environnement de développement, les vérifications, l'environnement Nextcloud
 - Les routes d'administration sont déclarées avec le niveau d'accès `ADMIN` d'AppAPI.
 
 Merci de signaler les problèmes de sécurité selon [SECURITY.md](../../SECURITY.md) (en anglais).
+
+## Services tiers
+
+Le serveur de Lucarne contacte YouTube pour lire les informations des chaînes, des playlists et des vidéos et pour récupérer les médias que vous lisez, et il télécharge des images depuis les hôtes d'images publics de YouTube. Lucarne ne contient ni statistiques d'usage, ni publicité, ni suivi, et n'exige pas de compte YouTube.
+
+Votre usage de YouTube reste soumis à ses conditions d'utilisation : il vous revient de les respecter, ainsi que le droit d'auteur. Lucarne n'est affiliée ni à YouTube ni à Nextcloud, et n'est approuvée par aucun des deux.
 
 ## Licence
 
