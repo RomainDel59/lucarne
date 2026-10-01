@@ -39,6 +39,7 @@ L'image contient Python, FastAPI, `yt-dlp` avec son résolveur de défis EJS, De
 - Conservation temporaire glissante des médias et conservation hors ligne optionnelle
 - Campagnes de catalogue persistantes et respectueuses des limites de débit, avec supervision visible des lots
 - Interface construite avec les composants Nextcloud, qui suit le thème clair, sombre ou personnalisé de chaque utilisateur
+- La langue de l'interface, les formats de date et la langue des titres et descriptions YouTube suivent les paramètres Nextcloud de chaque utilisateur
 - Anglais comme langue source et traduction française incluse
 - Isolation multi-utilisateur dès le premier enregistrement
 
@@ -71,6 +72,12 @@ L'environnement de développement, les vérifications, l'environnement Nextcloud
 - Les routes d'administration sont déclarées avec le niveau d'accès `ADMIN` d'AppAPI.
 
 Merci de signaler les problèmes de sécurité selon [SECURITY.md](../../SECURITY.md) (en anglais).
+
+## Services tiers
+
+Le serveur de Lucarne contacte YouTube pour lire les informations des chaînes, des playlists et des vidéos et pour récupérer les médias que vous lisez, et il télécharge des images depuis les hôtes d'images publics de YouTube. Lucarne ne contient ni statistiques d'usage, ni publicité, ni suivi, et n'exige pas de compte YouTube.
+
+Votre usage de YouTube reste soumis à ses conditions d'utilisation : il vous revient de les respecter, ainsi que le droit d'auteur. Lucarne n'est affiliée ni à YouTube ni à Nextcloud, et n'est approuvée par aucun des deux.
 
 ## Licence
 

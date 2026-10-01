@@ -42,7 +42,7 @@ Keep `@nextcloud/vue` and the related libraries on the versions used by the Next
 
 ## Localization
 
-English strings are the source strings, written as `t('English text')` in the web interface. Runtime web translations live in `static/i18n/<language>.json`, where `en.json` is empty because English needs no translation; Nextcloud application metadata translations live in `l10n/`.
+The interface language is the Nextcloud language of the user: the front-end sends it as the `Accept-Language` header of every request, and the dates use the Nextcloud locale. The server remembers it per user so the catalogue agent fetches YouTube titles and descriptions in the same language. English strings are the source strings, written as `t('English text')` in the web interface. Runtime web translations live in `static/i18n/<language>.json`, where `en.json` is empty because English needs no translation; Nextcloud application metadata translations live in `l10n/`.
 
 When adding a language:
 
@@ -50,6 +50,17 @@ When adding a language:
 2. Translate every value without changing the keys or placeholders such as `{count}`.
 3. Add the matching Nextcloud `l10n/<language>.json` and `.js` files.
 4. Add the language code to `SUPPORTED_LANGUAGES` in `src/localization.py`.
+
+## Releasing
+
+For each release:
+
+1. Set the new version everywhere it appears: `appinfo/info.xml` (`version` and `image-tag`), `pyproject.toml`, `src/__init__.py`, `src/main.py`, `frontend/package.json`, `frontend/package-lock.json`, and `frontend/vite.config.js`.
+2. Update the version in the installation command of `README.md` and its translations.
+3. Add the release to `CHANGELOG.md`.
+4. Merge, then push the tag `v<version>`. The workflow publishes the container image.
+
+Lucarne is not published in the Nextcloud App Store yet. The store follows the [publishing procedure of the Nextcloud developer manual](https://docs.nextcloud.com/server/latest/developer_manual/app_publishing_maintenance/publishing.html): a signing certificate for the app ID is requested once through the `nextcloud/app-certificate-requests` repository, and each release is an archive (a single top-level `lucarne` folder containing `appinfo/info.xml`) that is signed and uploaded once the container image exists.
 
 ## Try Lucarne in a local Nextcloud
 

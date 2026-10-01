@@ -3,19 +3,27 @@
       xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
   <id>lucarne</id>
   <name>Lucarne</name>
-  <summary>A calm, private YouTube library</summary>
+  <summary>A calm, private library for your own YouTube subscriptions</summary>
   <description><![CDATA[
-Follow YouTube channels, organize playlists and watch videos from a focused interface inside Nextcloud.
-Lucarne stores its catalogue and media in its own AppAPI persistent volume.
+Follow YouTube channels, organize playlists and watch videos from a focused interface inside Nextcloud. Lucarne is meant for your own subscriptions and stores its catalogue and media in its own AppAPI persistent volume.
+
+**Third-party service.** The Lucarne server contacts YouTube to read channel, playlist and video information and to fetch the media you play. Your use of YouTube remains subject to its terms of service, and you are responsible for complying with them and with copyright law. Lucarne is not affiliated with or endorsed by YouTube or Nextcloud.
+
+Lucarne includes no analytics, advertisements or tracking, and does not require a YouTube account.
   ]]></description>
   <version>1.1.0</version>
   <licence>AGPL-3.0-or-later</licence>
-  <author>Lucarne contributors</author>
+  <author homepage="https://github.com/RomainDel59">RomainDel59</author>
   <namespace>Lucarne</namespace>
+  <documentation>
+    <user>https://github.com/RomainDel59/lucarne#readme</user>
+  </documentation>
   <category>multimedia</category>
   <website>https://github.com/RomainDel59/lucarne</website>
   <bugs>https://github.com/RomainDel59/lucarne/issues</bugs>
   <repository type="git">https://github.com/RomainDel59/lucarne.git</repository>
+  <screenshot>https://raw.githubusercontent.com/RomainDel59/lucarne/master/docs/screenshot-home.png</screenshot>
+  <screenshot>https://raw.githubusercontent.com/RomainDel59/lucarne/master/docs/screenshot-subscriptions.png</screenshot>
   <dependencies>
     <nextcloud min-version="35" max-version="36" />
   </dependencies>

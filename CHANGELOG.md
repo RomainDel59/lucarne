@@ -2,6 +2,12 @@
 
 All notable changes to Lucarne are documented in this file.
 
+## Unreleased
+
+- Follow each user's Nextcloud language and locale for the interface, error messages, and dates, instead of the browser's.
+- Fetch YouTube titles and descriptions in each user's Nextcloud language instead of always in French.
+- Prepare the store listing: clearer summary and description, identifiable author, documentation link, screenshots, and a third-party services notice in the README.
+
 ## 1.1.0
 
 - Rewrite the web interface with Nextcloud components so it looks and behaves like the other Nextcloud apps and follows the light, dark and custom themes.

@@ -39,6 +39,7 @@ The image contains Python, FastAPI, `yt-dlp` with its EJS challenge solver, Deno
 - Sliding temporary-media retention and optional offline retention
 - Persistent, rate-conscious catalogue campaigns and visible batch supervision
 - Interface built with Nextcloud components, following the light, dark, or custom theme of each user
+- Interface language, date formats, and the language of YouTube titles and descriptions follow each user's Nextcloud settings
 - English source language and bundled French localization
 - Multi-user isolation from the first stored record
 
@@ -71,6 +72,12 @@ The development setup, checks, local Nextcloud environment, and the steps to add
 - Administrative routes are declared with AppAPI's `ADMIN` access level.
 
 Please report security issues according to [SECURITY.md](SECURITY.md).
+
+## Third-party services
+
+The Lucarne server contacts YouTube to read channel, playlist, and video information and to fetch the media you play, and it downloads images from YouTube's public image hosts. Lucarne includes no analytics, advertisements, or tracking, and does not require a YouTube account.
+
+Your use of YouTube remains subject to its terms of service, and you are responsible for complying with them and with copyright law. Lucarne is not affiliated with or endorsed by YouTube or Nextcloud.
 
 ## License
 
