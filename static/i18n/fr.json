@@ -36,6 +36,8 @@
   "Clear history": "Effacer l’historique",
   "Close": "Fermer",
   "Collection agent": "Agent de collecte",
+  "Language of YouTube titles and descriptions": "Langue des titres et descriptions YouTube",
+  "The YouTube metadata language is not supported.": "La langue des métadonnées YouTube n'est pas prise en charge.",
   "Control the pace of automatic YouTube requests and temporary media retention.": "Contrôlez le rythme des requêtes YouTube automatiques et la conservation temporaire des médias.",
   "Create": "Créer",
   "Defaults inherited by channels, playlists and videos.": "Valeurs par défaut héritées par les chaînes, playlists et vidéos.",

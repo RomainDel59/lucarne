@@ -181,7 +181,7 @@ def test_thumbnail_falls_back_to_youtube_standard_image(
     assert video["thumbnail_file"].endswith("-fallback.jpg")
 
 
-def test_youtube_is_queried_in_the_language_of_the_user(
+def test_youtube_is_queried_in_the_language_chosen_by_the_administrator(
     database: Database, repository: Repository, tmp_path: Path
 ) -> None:
     languages: list[str] = []
@@ -191,11 +191,13 @@ def test_youtube_is_queried_in_the_language_of_the_user(
         return {"entries": []}
 
     channel = repository.create_channel("alice", "https://www.youtube.com/@alice/videos")
-    repository.remember_language("alice", "de")
     agent = make_agent(database, repository, tmp_path)
     agent.youtube = SimpleNamespace(discover=discover)
 
     with pytest.raises(LucarneError):
         agent._initialize_channel("alice", int(channel["id"]))
+    repository.update_instance_settings({"metadata_language": "fr"})
+    with pytest.raises(LucarneError):
+        agent._initialize_channel("alice", int(channel["id"]))
 
-    assert languages == ["de"]
+    assert languages == ["en", "fr"]

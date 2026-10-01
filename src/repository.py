@@ -11,6 +11,7 @@ from urllib.parse import quote, urlsplit
 
 from .database import Database, placeholders
 from .errors import ConflictError, NotFoundError
+from .localization import SUPPORTED_LANGUAGES
 
 
 def now() -> int:
@@ -65,20 +66,6 @@ class Repository:
             )
         return self.db.one("SELECT * FROM user_settings WHERE user_id = ?", (user_id,)) or {}
 
-    def user_language(self, user_id: str) -> str:
-        """Return the language the user's YouTube metadata is fetched in."""
-        row = self.db.one("SELECT language FROM user_settings WHERE user_id = ?", (user_id,))
-        return str(row["language"]) if row else "en"
-
-    def remember_language(self, user_id: str, language: str) -> None:
-        """Store the user's language so background work can use it without a request."""
-        if self.personal_settings(user_id).get("language") == language:
-            return
-        with self.db.write() as connection:
-            connection.execute(
-                "UPDATE user_settings SET language = ?, updated_at = ? WHERE user_id = ?", (language, now(), user_id)
-            )
-
     def update_personal_settings(self, user_id: str, values: dict[str, Any]) -> dict[str, Any]:
         self.personal_settings(user_id)
         mode = str(values.get("default_mode", "video"))
@@ -105,8 +92,30 @@ class Repository:
             connection.execute("INSERT OR IGNORE INTO instance_settings(singleton, updated_at) VALUES (1, ?)", (now(),))
         return self.db.one("SELECT * FROM instance_settings WHERE singleton = 1") or {}
 
-    def update_instance_settings(self, values: dict[str, Any]) -> dict[str, Any]:
+    def metadata_language(self) -> str:
+        """Return the language YouTube titles and descriptions are fetched in; English until one is set."""
+        return str(self.instance_settings()["metadata_language"] or "en")
+
+    def has_metadata_language(self) -> bool:
+        return self.instance_settings()["metadata_language"] is not None
+
+    def set_metadata_language_if_unset(self, language: str) -> None:
+        """Initialize the metadata language once, never overriding a value an administrator may have chosen."""
+        if language not in SUPPORTED_LANGUAGES:
+            raise ValueError("The YouTube metadata language is not supported.")
         self.instance_settings()
+        with self.db.write() as connection:
+            connection.execute(
+                "UPDATE instance_settings SET metadata_language = ?, updated_at = ? "
+                "WHERE singleton = 1 AND metadata_language IS NULL",
+                (language, now()),
+            )
+
+    def update_instance_settings(self, values: dict[str, Any]) -> dict[str, Any]:
+        current = self.instance_settings()
+        language = values.get("metadata_language") or current["metadata_language"]
+        if language is not None and language not in SUPPORTED_LANGUAGES:
+            raise ValueError("The YouTube metadata language is not supported.")
         batch_size = int(values.get("batch_size", 10))
         lot_wait = int(values.get("lot_wait_seconds", 300))
         duration = int(values.get("campaign_duration_seconds", 7200))
@@ -122,8 +131,9 @@ class Repository:
         with self.db.write() as connection:
             connection.execute(
                 """UPDATE instance_settings SET batch_size = ?, lot_wait_seconds = ?,
-                   campaign_duration_seconds = ?, temporary_retention_days = ?, updated_at = ? WHERE singleton = 1""",
-                (batch_size, lot_wait, duration, retention, now()),
+                   campaign_duration_seconds = ?, temporary_retention_days = ?, metadata_language = ?,
+                   updated_at = ? WHERE singleton = 1""",
+                (batch_size, lot_wait, duration, retention, language, now()),
             )
         return self.instance_settings()
 

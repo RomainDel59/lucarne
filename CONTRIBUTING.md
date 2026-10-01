@@ -42,7 +42,7 @@ Keep `@nextcloud/vue` and the related libraries on the versions used by the Next
 
 ## Localization
 
-The interface language is the Nextcloud language of the user: the front-end sends it as the `Accept-Language` header of every request, and the dates use the Nextcloud locale. The server remembers it per user so the catalogue agent fetches YouTube titles and descriptions in the same language. English strings are the source strings, written as `t('English text')` in the web interface. Runtime web translations live in `static/i18n/<language>.json`, where `en.json` is empty because English needs no translation; Nextcloud application metadata translations live in `l10n/`.
+The interface language is the Nextcloud language of the user: the front-end sends it as the `Accept-Language` header of every request, and the dates use the Nextcloud locale. The language of the YouTube titles and descriptions is a single instance setting, chosen in Administration among the supported languages. It is initialized from the Nextcloud language of the first administrator, read when an administrator first opens Lucarne because only an administrator may list the administrator group; English is used until then. English strings are the source strings, written as `t('English text')` in the web interface. Runtime web translations live in `static/i18n/<language>.json`, where `en.json` is empty because English needs no translation; Nextcloud application metadata translations live in `l10n/`.
 
 When adding a language:
 
@@ -50,6 +50,7 @@ When adding a language:
 2. Translate every value without changing the keys or placeholders such as `{count}`.
 3. Add the matching Nextcloud `l10n/<language>.json` and `.js` files.
 4. Add the language code to `SUPPORTED_LANGUAGES` in `src/localization.py`.
+5. Add the language to `languageOptions` in `frontend/src/views/AdminView.vue`, so administrators can choose it for the YouTube metadata.
 
 ## Releasing
 

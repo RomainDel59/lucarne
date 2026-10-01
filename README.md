@@ -26,6 +26,8 @@ php occ app_api:app:register lucarne <daemon> --info-xml https://raw.githubuserc
 
 AppAPI then pulls and starts the matching container image automatically.
 
+Once installed, an administrator should open Lucarne once. The language of the YouTube titles and descriptions is a single instance setting: it is initialized from the Nextcloud language of the first administrator and can be changed in Administration (English or French). Until it is initialized, English is used.
+
 The image contains Python, FastAPI, `yt-dlp` with its EJS challenge solver, Deno, FFmpeg, the compiled web interface, and the HaRP FRP client. No extra worker container or database is required.
 
 
@@ -39,7 +41,7 @@ The image contains Python, FastAPI, `yt-dlp` with its EJS challenge solver, Deno
 - Sliding temporary-media retention and optional offline retention
 - Persistent, rate-conscious catalogue campaigns and visible batch supervision
 - Interface built with Nextcloud components, following the light, dark, or custom theme of each user
-- Interface language, date formats, and the language of YouTube titles and descriptions follow each user's Nextcloud settings
+- Interface language and date formats follow each user's Nextcloud settings; the language of YouTube titles and descriptions is an administrator setting
 - English source language and bundled French localization
 - Multi-user isolation from the first stored record
 

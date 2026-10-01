@@ -20,8 +20,9 @@ from .agent import Agent
 from .config import settings
 from .database import Database
 from .errors import ConflictError, LucarneError, NotFoundError
-from .localization import catalog, language_from_header, metadata_language_from_header, translate
+from .localization import catalog, language_from_header, translate
 from .media import MediaService
+from .metadata_language import first_administrator_language
 from .repository import Repository
 from .schemas import (
     CatalogChannelsRequest,
@@ -162,9 +163,11 @@ async def bootstrap(request: Request, nc: Annotated[AsyncNextcloudApp, Depends(a
         is_admin = "admin" in current_user.groups
     except Exception:
         is_admin = False
-    accepted = request.headers.get("accept-language")
-    language = language_from_header(accepted)
-    repository.remember_language(uid, metadata_language_from_header(accepted))
+    language = language_from_header(request.headers.get("accept-language"))
+    if is_admin and not repository.has_metadata_language():
+        detected = await first_administrator_language(nc)
+        if detected:
+            repository.set_metadata_language_if_unset(detected)
     return {
         "user_id": uid,
         "is_admin": is_admin,
@@ -535,7 +538,7 @@ async def delete_job(job_id: int, nc: Annotated[AsyncNextcloudApp, Depends(anc_a
 @APP.get("/api/admin/settings")
 async def get_admin_settings(nc: Annotated[AsyncNextcloudApp, Depends(anc_app)]) -> dict[str, Any]:
     await require_admin(nc)
-    return repository.instance_settings()
+    return {**repository.instance_settings(), "metadata_language": repository.metadata_language()}
 
 
 @APP.put("/api/admin/settings")
@@ -543,9 +546,9 @@ async def update_admin_settings(
     payload: InstanceSettingsRequest, nc: Annotated[AsyncNextcloudApp, Depends(anc_app)]
 ) -> dict[str, Any]:
     await require_admin(nc)
-    result = repository.update_instance_settings(payload.model_dump())
+    repository.update_instance_settings(payload.model_dump())
     repository.apply_instance_settings()
-    return result
+    return {**repository.instance_settings(), "metadata_language": repository.metadata_language()}
 
 
 def asset_path(kind: str, uid: str, identifier: int) -> Path:

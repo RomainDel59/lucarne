@@ -9,9 +9,6 @@ from pathlib import Path
 
 APPLICATION_ROOT = Path(__file__).resolve().parent.parent
 SUPPORTED_LANGUAGES = {"en", "fr"}
-# Languages whose YouTube metadata differs by region, so the region is kept.
-REGIONAL_LANGUAGES = {"pt", "zh"}
-LANGUAGE_TAG = re.compile(r"[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*")
 SEPARATOR = re.compile(r"[-_]")
 
 
@@ -22,17 +19,6 @@ def language_from_header(header: str | None) -> str:
         if language in SUPPORTED_LANGUAGES:
             return language
     return "en"
-
-
-def metadata_language_from_header(header: str | None) -> str:
-    """Return the YouTube metadata language for the first preference of an Accept-Language header."""
-    preference = (header or "").split(",", 1)[0].split(";", 1)[0].strip()
-    if not LANGUAGE_TAG.fullmatch(preference):
-        return "en"
-    parts = SEPARATOR.split(preference)
-    language = parts[0].lower()
-    region = next((part.upper() for part in parts[1:] if re.fullmatch(r"[A-Za-z]{2}", part)), None)
-    return f"{language}-{region}" if region and language in REGIONAL_LANGUAGES else language
 
 
 @lru_cache(maxsize=len(SUPPORTED_LANGUAGES))

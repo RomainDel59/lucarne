@@ -23,7 +23,6 @@ CREATE TABLE IF NOT EXISTS user_settings (
     default_quality TEXT NOT NULL DEFAULT '720',
     default_audio_quality TEXT NOT NULL DEFAULT '128',
     history_limit INTEGER NOT NULL DEFAULT 0,
-    language TEXT NOT NULL DEFAULT 'en',
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 );
@@ -34,6 +33,7 @@ CREATE TABLE IF NOT EXISTS instance_settings (
     lot_wait_seconds INTEGER NOT NULL DEFAULT 300,
     campaign_duration_seconds INTEGER NOT NULL DEFAULT 7200,
     temporary_retention_days INTEGER NOT NULL DEFAULT 7,
+    metadata_language TEXT,
     updated_at INTEGER NOT NULL
 );
 
@@ -240,7 +240,7 @@ class Database:
                     connection.execute("ALTER TABLE candidates ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'")
                     version = 2
                 if version == 2:
-                    connection.execute("ALTER TABLE user_settings ADD COLUMN language TEXT NOT NULL DEFAULT 'en'")
+                    connection.execute("ALTER TABLE instance_settings ADD COLUMN metadata_language TEXT")
                     version = 3
                 if version != SCHEMA_VERSION:
                     raise RuntimeError(f"Unsupported database schema version: {row['version']}")
