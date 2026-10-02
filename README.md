@@ -18,10 +18,10 @@ Lucarne is a Nextcloud AppAPI external application. Its API, catalogue agent, me
 
 ## Installation
 
-Register the latest release (v1.2.0) with AppAPI, using the `appinfo/info.xml` of its tag. Replace `<daemon>` with the name of your HaRP deploy daemon:
+Register the latest release (v1.3.0) with AppAPI, using the `appinfo/info.xml` of its tag. Replace `<daemon>` with the name of your HaRP deploy daemon:
 
 ```sh
-php occ app_api:app:register lucarne <daemon> --info-xml https://raw.githubusercontent.com/RomainDel59/lucarne/v1.2.0/appinfo/info.xml --wait-finish
+php occ app_api:app:register lucarne <daemon> --info-xml https://raw.githubusercontent.com/RomainDel59/lucarne/v1.3.0/appinfo/info.xml --wait-finish
 ```
 
 AppAPI then pulls and starts the matching container image automatically.
