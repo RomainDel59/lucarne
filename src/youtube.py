@@ -36,6 +36,13 @@ UNAVAILABLE_MARKERS = (
     "réservés aux membres",
     "contenu réservé aux membres",
     "contenus réservés aux membres",
+    # Premieres and live events that have not started: the video cannot be read yet.
+    "premieres in",
+    "premiere will begin",
+    "this live event will begin",
+    "première dans",
+    "la première commencera",
+    "cet événement en direct commencera",
 )
 
 

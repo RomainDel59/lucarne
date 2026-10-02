@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from src.assets import ALLOWED_IMAGE_HOSTS
-from src.errors import LucarneError
+from src.errors import LucarneError, VideoUnavailableError
 from src.youtube import (
     YouTubeClient,
     normalize_channel_url,
@@ -88,3 +88,33 @@ def test_no_language_is_forced_when_none_is_given(monkeypatch: pytest.MonkeyPatc
 @pytest.mark.parametrize("value", ["", "fr; --exec", "--exec", "FR", "fr-fr", "français"])
 def test_an_unexpected_language_is_never_passed_to_yt_dlp(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
     assert "--extractor-args" not in captured_command(monkeypatch, language=value)
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "ERROR: [youtube] ko_T10wLv-E: Première dans 110 minutes",
+        "ERROR: [youtube] ko_T10wLv-E: Premieres in 2 hours",
+        "ERROR: [youtube] ko_T10wLv-E: This live event will begin in 3 hours.",
+        "ERROR: [youtube] ko_T10wLv-E: Private video. Sign in if you've been granted access to this video",
+    ],
+)
+def test_a_video_that_cannot_be_read_yet_is_skipped_like_a_private_one(
+    monkeypatch: pytest.MonkeyPatch, message: str
+) -> None:
+    monkeypatch.setattr(
+        subprocess, "run", lambda *_, **__: SimpleNamespace(returncode=1, stdout="", stderr=message)
+    )
+
+    with pytest.raises(VideoUnavailableError):
+        YouTubeClient().run(["--dump-single-json", "https://www.youtube.com/watch?v=ko_T10wLv-E"])
+
+
+def test_a_real_failure_is_still_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        subprocess, "run", lambda *_, **__: SimpleNamespace(returncode=1, stdout="", stderr="HTTP Error 429")
+    )
+
+    with pytest.raises(LucarneError) as caught:
+        YouTubeClient().run(["--dump-single-json", "https://www.youtube.com/watch?v=ko_T10wLv-E"])
+    assert not isinstance(caught.value, VideoUnavailableError)
