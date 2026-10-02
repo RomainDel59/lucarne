@@ -22,6 +22,7 @@
 					</template>
 					{{ t('Subscribe') }}
 				</NcButton>
+				<YoutubeLink :url="data.channel.source_url" />
 			</template>
 		</PageHeader>
 		<NcLoadingIcon v-if="loading && !data" :size="44" />
@@ -69,6 +70,7 @@ import PageHeader from '../components/PageHeader.vue'
 import Pagination from '../components/Pagination.vue'
 import PlaybackDialog from '../components/PlaybackDialog.vue'
 import VideoGrid from '../components/VideoGrid.vue'
+import YoutubeLink from '../components/YoutubeLink.vue'
 import { useAsync } from '../composables/useAsync.js'
 import { usePagedGrid } from '../composables/usePagedGrid.js'
 import { confirm } from '../dialogs.js'

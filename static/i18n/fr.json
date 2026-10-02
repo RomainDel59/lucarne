@@ -32,6 +32,7 @@
   "Catalogue channels": "Chaînes du catalogue",
   "Catalogue saved": "Catalogue enregistré",
   "\"{channel}\" is already in the catalogue \"{catalog}\"": "« {channel} » est déjà dans le catalogue « {catalog} »",
+  "Open on YouTube": "Ouvrir sur YouTube",
   "Remove from \"{catalog}\"": "Retirer de « {catalog} »",
   "\"{channel}\" removed from the catalogue \"{catalog}\"": "« {channel} » retirée du catalogue « {catalog} »",
   "\"{channel}\" added to the catalogue \"{catalog}\"": "« {channel} » ajoutée au catalogue « {catalog} »",
