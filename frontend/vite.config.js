@@ -27,7 +27,7 @@ export default defineConfig({
 		'process.env.NODE_ENV': JSON.stringify('production'),
 		// Globals expected by @nextcloud/vue (set by the Nextcloud webpack/vite configs).
 		appName: JSON.stringify('lucarne'),
-		appVersion: JSON.stringify(process.env.npm_package_version || '1.2.0'),
+		appVersion: JSON.stringify(process.env.npm_package_version || '1.3.0'),
 		__VUE_OPTIONS_API__: 'true',
 		__VUE_PROD_DEVTOOLS__: 'false',
 		__VUE_PROD_HYDRATION_MISMATCH_DETAILS__: 'false',

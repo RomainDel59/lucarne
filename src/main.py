@@ -34,6 +34,7 @@ from .schemas import (
     PersonalSettingsRequest,
     PlaybackUpdate,
     PlaylistCreate,
+    PlaylistMoveRequest,
     PlaylistUpdate,
     PlaylistVideoRequest,
     RetentionRequest,
@@ -78,7 +79,7 @@ async def lifespan(app: FastAPI):
     media.stop()
 
 
-APP = FastAPI(title="Lucarne", version="1.2.0", lifespan=lifespan, docs_url=None, redoc_url=None)
+APP = FastAPI(title="Lucarne", version="1.3.0", lifespan=lifespan, docs_url=None, redoc_url=None)
 APP.add_middleware(AppAPIAuthMiddleware)
 for static_directory in ("js", "css", "img"):
     APP.mount(
@@ -395,8 +396,8 @@ async def add_playlist_video(
     if repository.playlist(uid, playlist_id)["kind"] != "personal":
         raise ConflictError("A YouTube playlist is managed by the collection agent.")
     if payload.video_id is not None:
-        repository.attach_video(uid, playlist_id, payload.video_id)
-        return {"queued": False}
+        added = repository.attach_video(uid, playlist_id, payload.video_id)
+        return {"queued": False, "added": added}
     if not payload.url:
         raise ValueError("A video identifier or URL is required.")
     job = repository.enqueue(
@@ -408,6 +409,17 @@ async def add_playlist_video(
         True,
     )
     return {"queued": True, "job": job}
+
+
+@APP.put("/api/playlists/{playlist_id}/videos/{video_id}/position")
+async def move_playlist_video(
+    playlist_id: int, video_id: int, payload: PlaylistMoveRequest, nc: Annotated[AsyncNextcloudApp, Depends(anc_app)]
+) -> dict[str, bool]:
+    uid = user_id(nc)
+    if repository.playlist(uid, playlist_id)["kind"] != "personal":
+        raise ConflictError("A YouTube playlist is managed by the collection agent.")
+    repository.move_playlist_video(uid, playlist_id, video_id, payload.target_video_id, payload.after)
+    return {"moved": True}
 
 
 @APP.delete("/api/playlists/{playlist_id}/videos/{video_id}")
@@ -448,6 +460,20 @@ async def replace_catalog_channels(
     catalog_id: int, payload: CatalogChannelsRequest, nc: Annotated[AsyncNextcloudApp, Depends(anc_app)]
 ) -> dict[str, Any]:
     return repository.replace_catalog_channels(user_id(nc), catalog_id, payload.channel_ids)
+
+
+@APP.put("/api/catalogs/{catalog_id}/channels/{channel_id}")
+async def add_channel_to_catalog(
+    catalog_id: int, channel_id: int, nc: Annotated[AsyncNextcloudApp, Depends(anc_app)]
+) -> dict[str, Any]:
+    return repository.add_channel_to_catalog(user_id(nc), catalog_id, channel_id)
+
+
+@APP.delete("/api/catalogs/{catalog_id}/channels/{channel_id}")
+async def remove_channel_from_catalog(
+    catalog_id: int, channel_id: int, nc: Annotated[AsyncNextcloudApp, Depends(anc_app)]
+) -> dict[str, Any]:
+    return repository.remove_channel_from_catalog(user_id(nc), catalog_id, channel_id)
 
 
 @APP.delete("/api/catalogs/{catalog_id}")

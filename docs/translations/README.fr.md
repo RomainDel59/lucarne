@@ -18,10 +18,10 @@ Lucarne est une application externe AppAPI de Nextcloud. Son API, son agent de c
 
 ## Installation
 
-Enregistrez la dernière version publiée (v1.2.0) auprès d'AppAPI, avec le fichier `appinfo/info.xml` de son tag. Remplacez `<démon>` par le nom de votre démon de déploiement HaRP :
+Enregistrez la dernière version publiée (v1.3.0) auprès d'AppAPI, avec le fichier `appinfo/info.xml` de son tag. Remplacez `<démon>` par le nom de votre démon de déploiement HaRP :
 
 ```sh
-php occ app_api:app:register lucarne <démon> --info-xml https://raw.githubusercontent.com/RomainDel59/lucarne/v1.2.0/appinfo/info.xml --wait-finish
+php occ app_api:app:register lucarne <démon> --info-xml https://raw.githubusercontent.com/RomainDel59/lucarne/v1.3.0/appinfo/info.xml --wait-finish
 ```
 
 AppAPI télécharge et démarre ensuite automatiquement l'image de conteneur correspondante.
@@ -35,7 +35,9 @@ L'image contient Python, FastAPI, `yt-dlp` avec son résolveur de défis EJS, De
 
 - Pages de vidéos chronologiques affichant deux rangées complètes par page, avec des boutons précédent et suivant en icônes seules
 - Abonnements à des chaînes et playlists YouTube ou personnelles, en grilles paginées qui se trient et se filtrent
-- Catalogues classés par ordre alphabétique et vue automatique des vidéos sans catalogue
+- Catalogues classés par ordre alphabétique et vue automatique des vidéos sans catalogue ; glissez un abonnement sur un catalogue du menu pour l'y ajouter, ou sur la zone de retrait pour l'enlever du catalogue affiché
+- Playlists personnelles dans l'ordre de votre choix : glissez des vidéos sur une playlist du menu pour les y ajouter, et une tuile avant ou après une autre pour les réordonner. Les playlists importées de YouTube gardent l'ordre de YouTube
+- Lien pour ouvrir sur YouTube n'importe quelle chaîne, vidéo ou playlist importée
 - Qualité de lecture (vidéo jusqu'à 1080p, audio de 64 à 256 kbps), mode audio, profondeur d'historique et appartenance aux catalogues propres à chaque utilisateur
 - Téléchargement et lecture immédiats, avec prise en charge des requêtes HTTP par plage
 - Conservation temporaire glissante des médias et conservation hors ligne optionnelle

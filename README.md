@@ -18,10 +18,10 @@ Lucarne is a Nextcloud AppAPI external application. Its API, catalogue agent, me
 
 ## Installation
 
-Register the latest release (v1.2.0) with AppAPI, using the `appinfo/info.xml` of its tag. Replace `<daemon>` with the name of your HaRP deploy daemon:
+Register the latest release (v1.3.0) with AppAPI, using the `appinfo/info.xml` of its tag. Replace `<daemon>` with the name of your HaRP deploy daemon:
 
 ```sh
-php occ app_api:app:register lucarne <daemon> --info-xml https://raw.githubusercontent.com/RomainDel59/lucarne/v1.2.0/appinfo/info.xml --wait-finish
+php occ app_api:app:register lucarne <daemon> --info-xml https://raw.githubusercontent.com/RomainDel59/lucarne/v1.3.0/appinfo/info.xml --wait-finish
 ```
 
 AppAPI then pulls and starts the matching container image automatically.
@@ -35,7 +35,9 @@ The image contains Python, FastAPI, `yt-dlp` with its EJS challenge solver, Deno
 
 - Chronological video pages showing two complete rows per page, with icon-only previous and next buttons
 - Channel subscriptions and YouTube or personal playlists, in paginated grids that can be sorted and filtered
-- Alphabetical catalogues and an automatic uncatalogued view
+- Alphabetical catalogues and an automatic uncatalogued view; drag a subscription onto a catalogue of the navigation to add it, or onto the removal zone to take it out of the catalogue being viewed
+- Personal playlists in the order you choose: drag videos onto a playlist of the navigation to add them, and drag a tile before or after another to reorder them. Playlists imported from YouTube keep the order of YouTube
+- Link to open any channel, video or imported playlist on YouTube
 - Per-user playback quality (video up to 1080p, audio from 64 to 256 kbps), audio mode, history depth, and catalogue membership
 - Immediate download-and-play with HTTP range support
 - Sliding temporary-media retention and optional offline retention

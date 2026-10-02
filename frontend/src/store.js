@@ -2,7 +2,7 @@ import { reactive } from 'vue'
 import { request } from './api.js'
 import { i18n } from './i18n.js'
 
-export const state = reactive({ bootstrap: null })
+export const state = reactive({ bootstrap: null, playlists: [], catalogRevision: 0, playlistRevision: 0 })
 
 export async function loadBootstrap() {
 	const data = await request('api/bootstrap')
@@ -13,6 +13,21 @@ export async function loadBootstrap() {
 
 export function setCatalogs(catalogs) {
 	state.bootstrap.catalogs = catalogs
+}
+
+/** Tell the lists that depend on catalogue memberships that they changed. */
+export function catalogMembershipsChanged() {
+	state.catalogRevision++
+}
+
+/** Playlists of the navigation: all of them, personal ones and those imported from YouTube. */
+export async function loadPlaylists() {
+	state.playlists = await request('api/playlists')
+}
+
+/** Tell the pages that show the content of playlists that it changed. */
+export function playlistContentChanged() {
+	state.playlistRevision++
 }
 
 let pending = null

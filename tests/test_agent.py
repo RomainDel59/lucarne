@@ -201,3 +201,18 @@ def test_youtube_is_queried_in_the_language_chosen_by_the_administrator(
         agent._initialize_channel("alice", int(channel["id"]))
 
     assert languages == ["en", "fr"]
+
+
+def test_a_playlist_keeps_its_own_title_but_a_channel_takes_its_author_name(
+    database: Database, repository: Repository, tmp_path: Path
+) -> None:
+    channel = repository.create_channel("alice", "https://www.youtube.com/@alice/videos")
+    playlist = repository.create_playlist("alice", "Mix", "https://www.youtube.com/playlist?list=PLabcdefghijk")
+    agent = make_agent(database, repository, tmp_path)
+    data = {"title": "My playlist", "channel": "Alice Owner", "uploader": "Alice Owner", "entries": []}
+
+    agent._update_source("alice", "playlist", int(playlist["id"]), data)
+    agent._update_source("alice", "channel", int(channel["id"]), {**data, "title": "Alice - Videos"})
+
+    assert repository.playlist("alice", int(playlist["id"]))["title"] == "My playlist"
+    assert repository.channel("alice", int(channel["id"]))["title"] == "Alice Owner"

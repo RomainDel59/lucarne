@@ -359,6 +359,8 @@ class Repository:
         total = self.db.one(
             f"SELECT COUNT(DISTINCT v.id) AS count FROM videos v{joins} WHERE {where}", tuple(parameters)
         )
+        # A playlist keeps its own order, never the publication date.
+        order = "pv.position, pv.added_at, v.id" if playlist_id is not None else "v.published_at DESC, v.id DESC"
         offset = (page - 1) * page_size
         pending_on_page = max(0, min(page_size, pending_count - offset))
         video_limit = page_size - pending_on_page
@@ -368,7 +370,7 @@ class Repository:
                 f"""SELECT DISTINCT v.*, h.position AS history_position, h.duration AS history_duration,
                            h.completed AS history_completed
                     FROM videos v{joins} LEFT JOIN histories h ON h.video_id=v.id AND h.user_id=v.user_id
-                    WHERE {where} ORDER BY v.published_at DESC, v.id DESC LIMIT ? OFFSET ?""",
+                    WHERE {where} ORDER BY {order} LIMIT ? OFFSET ?""",
                 tuple([*parameters, video_limit, video_offset]),
             )
             if video_limit
@@ -488,17 +490,53 @@ class Repository:
             )
         return row
 
-    def attach_video(self, user_id: str, playlist_id: int, video_id: int) -> None:
+    def attach_video(self, user_id: str, playlist_id: int, video_id: int, position: int | None = None) -> bool:
+        """Put a video in a playlist and tell whether it was added.
+
+        Without a position, the video goes at the end. The agent gives the rank of the video on YouTube, which
+        also moves a video that is already there.
+        """
         self.playlist(user_id, playlist_id)
         self.video(user_id, video_id)
         with self.db.write() as connection:
-            position = connection.execute(
+            if position is not None:
+                cursor = connection.execute(
+                    """INSERT INTO playlist_videos(playlist_id,video_id,position,added_at) VALUES (?,?,?,?)
+                       ON CONFLICT(playlist_id,video_id) DO UPDATE SET position=excluded.position""",
+                    (playlist_id, video_id, position, now()),
+                )
+                return cursor.rowcount > 0
+            end = connection.execute(
                 "SELECT COALESCE(MAX(position),-1)+1 AS position FROM playlist_videos WHERE playlist_id=?",
                 (playlist_id,),
             ).fetchone()["position"]
-            connection.execute(
+            cursor = connection.execute(
                 "INSERT OR IGNORE INTO playlist_videos(playlist_id,video_id,position,added_at) VALUES (?,?,?,?)",
-                (playlist_id, video_id, position, now()),
+                (playlist_id, video_id, end, now()),
+            )
+            return cursor.rowcount > 0
+
+    def move_playlist_video(
+        self, user_id: str, playlist_id: int, video_id: int, target_video_id: int, after: bool
+    ) -> None:
+        """Place a video just before or after another one of the same playlist, then number the whole list again."""
+        self.playlist(user_id, playlist_id)
+        with self.db.write() as connection:
+            order = [
+                int(row["video_id"])
+                for row in connection.execute(
+                    "SELECT video_id FROM playlist_videos WHERE playlist_id=? ORDER BY position,added_at,video_id",
+                    (playlist_id,),
+                )
+            ]
+            if video_id not in order or target_video_id not in order:
+                raise NotFoundError("Video not found in this playlist.")
+            if video_id != target_video_id:
+                order.remove(video_id)
+                order.insert(order.index(target_video_id) + (1 if after else 0), video_id)
+            connection.executemany(
+                "UPDATE playlist_videos SET position=? WHERE playlist_id=? AND video_id=?",
+                [(index, playlist_id, value) for index, value in enumerate(order)],
             )
 
     def detach_video(self, user_id: str, playlist_id: int, video_id: int) -> None:
@@ -571,6 +609,32 @@ class Repository:
             connection.executemany(
                 "INSERT INTO channel_catalog_memberships(catalog_id,channel_id) VALUES (?,?)",
                 [(catalog_id, value) for value in channel_ids],
+            )
+        return self.catalog(user_id, catalog_id)
+
+    def add_channel_to_catalog(self, user_id: str, catalog_id: int, channel_id: int) -> dict[str, Any]:
+        """Add one channel to a catalogue, keeping its other memberships.
+
+        The result tells with `added` whether the channel was really added: adding it twice changes nothing.
+        """
+        self.catalog(user_id, catalog_id)
+        if not self.db.one("SELECT id FROM channels WHERE id=? AND user_id=?", (channel_id, user_id)):
+            raise NotFoundError("Channel not found.")
+        with self.db.write() as connection:
+            cursor = connection.execute(
+                "INSERT OR IGNORE INTO channel_catalog_memberships(catalog_id,channel_id) VALUES (?,?)",
+                (catalog_id, channel_id),
+            )
+            added = cursor.rowcount > 0
+        return {**self.catalog(user_id, catalog_id), "added": added}
+
+    def remove_channel_from_catalog(self, user_id: str, catalog_id: int, channel_id: int) -> dict[str, Any]:
+        """Remove one channel from a catalogue only; removing an absent channel changes nothing."""
+        self.catalog(user_id, catalog_id)
+        with self.db.write() as connection:
+            connection.execute(
+                "DELETE FROM channel_catalog_memberships WHERE catalog_id=? AND channel_id=?",
+                (catalog_id, channel_id),
             )
         return self.catalog(user_id, catalog_id)
 

@@ -20,7 +20,7 @@
 						:options="catalogOptions"
 						:label="t('Catalogue')"
 						@update:model-value="changeCatalog" />
-					<NcButton variant="secondary" @click="naming = { mode: 'add', value: '' }">
+					<NcButton variant="primary" @click="naming = { mode: 'add', value: '' }">
 						<template #icon>
 							<PlusIcon :size="20" />
 						</template>

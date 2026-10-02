@@ -2,6 +2,19 @@
 
 All notable changes to Lucarne are documented in this file.
 
+## 1.3.0
+
+- Drag a subscription from the Subscriptions page onto a catalogue of the navigation to add it, without leaving its other catalogues. A notification tells when the channel is added, or that it is already there.
+- While viewing the subscriptions of one catalogue, drag a subscription onto the removal zone at the bottom of the page to take it out of that catalogue only.
+- The navigation has a Playlists menu, closed by default, listing every playlist. Drag a video tile onto a personal playlist to add it. Playlists imported from YouTube do not accept dropped videos.
+- Personal playlists are ordered by hand: a video is added at the end, and dragging a tile before or after another one of the page changes the order. Videos are removed by dragging them onto the removal zone, which replaces the removal button of the tiles. Playlists imported from YouTube follow the order of YouTube. Personal playlists no longer follow the publication date, so their existing videos now appear in the order they were added.
+- Add a button to open a channel, a video or an imported playlist on YouTube.
+- Keep the channel and the date of a video tile on one line, with an ellipsis and a tooltip on a long channel name.
+- Make the add catalogue button primary.
+- Fix an imported playlist being named after its owner instead of its own title.
+- Skip premieres and live events that have not started, like private videos, instead of failing the subscription.
+- Upgrading from 1.2.0 migrates the database automatically (schema version 4).
+
 ## 1.2.0
 
 - Follow each user's Nextcloud language and locale for the interface, error messages, and dates, instead of the browser's.

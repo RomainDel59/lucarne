@@ -1,36 +1,43 @@
 <template>
-	<div ref="pageElement" class="lucarne-page">
-		<PageHeader :title="t('Subscriptions')">
-			<ToolbarMenu v-model="catalog" :options="catalogOptions" :label="t('Catalogue')" :icon="FilterVariantIcon" />
-				<ToolbarMenu v-model="sort" :options="sortOptions" :label="t('Sort')" :icon="SortIcon" />
-			<NcButton variant="primary" @click="adding = true">
+	<div class="lucarne-page-frame">
+		<div ref="pageElement" class="lucarne-page">
+			<PageHeader :title="t('Subscriptions')">
+				<ToolbarMenu v-model="catalog" :options="catalogOptions" :label="t('Catalogue')" :icon="FilterVariantIcon" />
+					<ToolbarMenu v-model="sort" :options="sortOptions" :label="t('Sort')" :icon="SortIcon" />
+				<NcButton variant="primary" @click="adding = true">
+					<template #icon>
+						<PlusIcon :size="20" />
+					</template>
+					{{ t('Add') }}
+				</NcButton>
+			</PageHeader>
+			<NcLoadingIcon v-if="loading && !data" :size="44" />
+			<NcEmptyContent v-else-if="error" :name="t('Something went wrong')" :description="error.message">
 				<template #icon>
-					<PlusIcon :size="20" />
-				</template>
-				{{ t('Add') }}
-			</NcButton>
-		</PageHeader>
-		<NcLoadingIcon v-if="loading && !data" :size="44" />
-		<NcEmptyContent v-else-if="error" :name="t('Something went wrong')" :description="error.message">
-			<template #icon>
-				<AlertCircleIcon />
-			</template>
-		</NcEmptyContent>
-		<template v-else-if="data">
-			<EntityGrid v-if="channels.length" :items="channels" type="channel" :page="page" :page-size="pageSize" @change="goTo" />
-			<NcEmptyContent v-else :name="t('No subscriptions')" :description="t('Add a YouTube channel to follow its videos.')">
-				<template #icon>
-					<YoutubeSubscriptionIcon />
+					<AlertCircleIcon />
 				</template>
 			</NcEmptyContent>
-		</template>
-		<UrlDialog
-			v-if="adding"
-			:title="t('Add a subscription')"
-			:label="t('YouTube channel URL')"
-			:submit-label="t('Add')"
-			@submit="addChannel"
-			@close="adding = false" />
+			<template v-else-if="data">
+				<EntityGrid v-if="channels.length" :items="channels" type="channel" :page="page" :page-size="pageSize" @change="goTo" />
+				<NcEmptyContent v-else :name="t('No subscriptions')" :description="t('Add a YouTube channel to follow its videos.')">
+					<template #icon>
+						<YoutubeSubscriptionIcon />
+					</template>
+				</NcEmptyContent>
+			</template>
+			<UrlDialog
+				v-if="adding"
+				:title="t('Add a subscription')"
+				:label="t('YouTube channel URL')"
+				:submit-label="t('Add')"
+				@submit="addChannel"
+				@close="adding = false" />
+		</div>
+		<RemoveDropZone
+			v-if="filteredCatalog"
+			:type="CHANNEL_DRAG_TYPE"
+			:label="removeLabel"
+			@drop="removeChannel" />
 	</div>
 </template>
 
@@ -53,13 +60,15 @@ import YoutubeSubscriptionIcon from 'vue-material-design-icons/YoutubeSubscripti
 import { request, send } from '../api.js'
 import EntityGrid from '../components/EntityGrid.vue'
 import PageHeader from '../components/PageHeader.vue'
+import RemoveDropZone from '../components/RemoveDropZone.vue'
 import ToolbarMenu from '../components/ToolbarMenu.vue'
 import UrlDialog from '../components/UrlDialog.vue'
+import { CHANNEL_DRAG_TYPE } from '../drag.js'
 import { useAsync } from '../composables/useAsync.js'
 import { usePagedGrid } from '../composables/usePagedGrid.js'
 import { t } from '../i18n.js'
 import { notify, notifyError } from '../notify.js'
-import { state } from '../store.js'
+import { catalogMembershipsChanged, state } from '../store.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -82,6 +91,9 @@ const catalogOptions = computed(() => [
 	...state.bootstrap.catalogs.map((item) => ({ id: String(item.id), label: item.name, icon: FolderOutlineIcon })),
 	{ id: 'uncategorized', label: t('Uncatalogued'), icon: FolderOffOutlineIcon },
 ])
+// The zone to drop a subscription on only exists when the list is filtered on one catalogue.
+const filteredCatalog = computed(() => state.bootstrap.catalogs.find((item) => String(item.id) === catalog.value) || null)
+const removeLabel = computed(() => t('Remove from "{catalog}"', { catalog: filteredCatalog.value?.name || '' }))
 const sortOptions = [
 	{ id: 'alpha', label: t('Alphabetical order'), icon: SortAlphabeticalAscendingIcon },
 	{ id: 'recent', label: t('Latest video'), icon: SortClockDescendingIcon },
@@ -93,7 +105,7 @@ const { data, loading, error, reload } = useAsync(() => {
 	}
 	const filter = catalog.value === 'uncategorized' ? '?uncategorized=true' : catalog.value !== 'all' ? `?catalog_id=${catalog.value}` : ''
 	return request(`api/channels${filter}`)
-}, () => [route.name, route.query.catalog])
+}, () => [route.name, route.query.catalog, state.catalogRevision])
 
 const channels = computed(() => {
 	const list = [...(data.value || [])]
@@ -105,6 +117,17 @@ const channels = computed(() => {
 
 watch(() => [pageSize.value, channels.value.length], () => settle(channels.value.length))
 
+async function removeChannel(channel) {
+	const target = filteredCatalog.value
+	try {
+		await send('DELETE', `api/catalogs/${target.id}/channels/${channel.id}`)
+		catalogMembershipsChanged()
+		notify(t('"{channel}" removed from the catalogue "{catalog}"', { channel: channel.title, catalog: target.name }))
+	} catch (error) {
+		notifyError(error)
+	}
+}
+
 async function addChannel(url) {
 	try {
 		await send('POST', 'api/channels', { url })
@@ -115,4 +138,3 @@ async function addChannel(url) {
 	}
 }
 </script>
-

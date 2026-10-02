@@ -1,5 +1,12 @@
 <template>
-	<div class="lucarne-video-card">
+	<div
+		class="lucarne-video-card"
+		:class="{ 'lucarne-video-card--before': dropSide === 'before', 'lucarne-video-card--after': dropSide === 'after' }"
+		:draggable="!pending"
+		@dragstart="startDrag"
+		@dragover="overCard"
+		@dragleave="dropSide = ''"
+		@drop.prevent="dropOnCard">
 		<component
 			:is="pending ? 'div' : RouterLink"
 			v-bind="pending ? {} : { to: { name: 'video', params: { id: video.id }, query: playlistId ? { playlistId } : {} } }"
@@ -18,49 +25,70 @@
 			</div>
 			<div class="lucarne-video-card__body">
 				<span class="lucarne-video-card__title" :title="title">{{ title }}</span>
-				<span class="lucarne-video-card__meta">{{ meta }}</span>
+				<span class="lucarne-video-card__meta">
+						<span v-if="channelName" class="lucarne-video-card__channel" :title="channelName">{{ channelName }}</span>
+						<span v-if="channelName" aria-hidden="true">·</span>
+						<span class="lucarne-video-card__date">{{ date }}</span>
+					</span>
 			</div>
 		</component>
-		<NcButton
-			v-if="removable"
-			class="lucarne-video-card__remove"
-			variant="tertiary"
-			:aria-label="t('Remove')"
-			@click="$emit('remove', video)">
-			<template #icon>
-				<DeleteIcon :size="20" />
-			</template>
-		</NcButton>
 	</div>
 </template>
 
 <script setup>
-import NcButton from '@nextcloud/vue/components/NcButton'
 import NcChip from '@nextcloud/vue/components/NcChip'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import DeleteIcon from 'vue-material-design-icons/Delete.vue'
 import VideoOutlineIcon from 'vue-material-design-icons/VideoOutline.vue'
 import { apiUrl } from '../api.js'
+import { VIDEO_DRAG_TYPE } from '../drag.js'
 import { formatDate, formatDuration } from '../format.js'
 import { t } from '../i18n.js'
 
 const props = defineProps({
 	video: { type: Object, required: true },
 	playlistId: { type: Number, default: null },
-	removable: { type: Boolean, default: false },
+	/** The tile can be dropped on, to place another video of the same list before or after it. */
+	reorderable: { type: Boolean, default: false },
 	/** A video that is still waiting for the agent to collect its metadata. */
 	pending: { type: Boolean, default: false },
 })
-defineEmits(['remove'])
+const emit = defineEmits(['reorder'])
+
+const dropSide = ref('')
+
+function startDrag(event) {
+	if (props.pending) {
+		return
+	}
+	event.dataTransfer.effectAllowed = 'copyMove'
+	event.dataTransfer.setData(VIDEO_DRAG_TYPE, JSON.stringify({ id: props.video.id, title: props.video.title }))
+}
+
+function overCard(event) {
+	if (!props.reorderable || !event.dataTransfer?.types.includes(VIDEO_DRAG_TYPE)) {
+		return
+	}
+	event.preventDefault()
+	event.dataTransfer.dropEffect = 'move'
+	const box = event.currentTarget.getBoundingClientRect()
+	dropSide.value = event.clientX < box.left + box.width / 2 ? 'before' : 'after'
+}
+
+function dropOnCard(event) {
+	const side = dropSide.value
+	dropSide.value = ''
+	const payload = event.dataTransfer?.getData(VIDEO_DRAG_TYPE)
+	if (props.reorderable && payload && side) {
+		emit('reorder', { id: JSON.parse(payload).id, target: props.video.id, after: side === 'after' })
+	}
+}
 
 const thumbnail = computed(() => (props.video.thumbnail_url ? apiUrl(props.video.thumbnail_url) : ''))
 const unavailable = computed(() => props.video.availability && props.video.availability !== 'available')
 const title = computed(() => props.video.title || t('Pending video'))
-const meta = computed(() => {
-	const date = formatDate(props.video.published_at || props.video.created_at)
-	return props.pending ? date : `${props.video.channel_name || t('Standalone video')} · ${date}`
-})
+const channelName = computed(() => (props.pending ? '' : props.video.channel_name || t('Standalone video')))
+const date = computed(() => formatDate(props.video.published_at || props.video.created_at))
 const progress = computed(() => {
 	const duration = Number(props.video.history_duration || 0)
 	return duration > 0 ? Math.min(100, (Number(props.video.history_position || 0) / duration) * 100) : 0
@@ -75,6 +103,30 @@ const progress = computed(() => {
 	border-radius: var(--border-radius-container);
 	background-color: var(--color-main-background);
 	border: 1px solid var(--color-border);
+}
+
+/* Where the dragged video will be placed: a bar on the side of the tile, in the gap of the grid. */
+.lucarne-video-card--before,
+.lucarne-video-card--after {
+	overflow: visible;
+}
+
+.lucarne-video-card--before::before,
+.lucarne-video-card--after::after {
+	content: '';
+	position: absolute;
+	inset-block: 0;
+	width: calc(var(--default-grid-baseline));
+	border-radius: var(--border-radius-small, 4px);
+	background-color: var(--color-primary-element);
+}
+
+.lucarne-video-card--before::before {
+	inset-inline-start: calc(var(--default-grid-baseline) * -3);
+}
+
+.lucarne-video-card--after::after {
+	inset-inline-end: calc(var(--default-grid-baseline) * -3);
 }
 
 .lucarne-video-card:hover,
@@ -153,17 +205,21 @@ const progress = computed(() => {
 }
 
 .lucarne-video-card__meta {
-	display: -webkit-box;
+	display: flex;
+	gap: var(--default-grid-baseline);
 	margin-block-start: auto;
-	overflow: hidden;
+	white-space: nowrap;
 	color: var(--color-text-maxcontrast);
-	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 2;
 }
 
-.lucarne-video-card__remove {
-	position: absolute;
-	inset-inline-end: var(--default-grid-baseline);
-	inset-block-end: var(--default-grid-baseline);
+.lucarne-video-card__channel {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
+
+.lucarne-video-card__date {
+	flex: none;
+}
+
 </style>

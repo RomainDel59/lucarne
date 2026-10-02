@@ -17,8 +17,13 @@
 					<NcAppNavigationItem
 						v-for="catalog in catalogs"
 						:key="catalog.id"
+						:class="{ 'lucarne-drop-target': dropTarget === `catalog-${catalog.id}` }"
 						:name="catalog.name"
-						:to="{ name: 'catalog', params: { id: catalog.id } }">
+						:to="{ name: 'catalog', params: { id: catalog.id } }"
+						@dragover="allowDrop($event, CHANNEL_DRAG_TYPE)"
+						@dragenter="dropTarget = `catalog-${catalog.id}`"
+						@dragleave="leaveDrop(`catalog-${catalog.id}`, $event)"
+						@drop.prevent="dropChannel(catalog, $event)">
 						<template #icon>
 							<FolderOutlineIcon :size="20" />
 						</template>
@@ -34,10 +39,26 @@
 						<YoutubeSubscriptionIcon :size="20" />
 					</template>
 				</NcAppNavigationItem>
-				<NcAppNavigationItem :name="t('Playlists')" :to="{ name: 'playlists' }">
+				<NcAppNavigationItem
+					v-model:open="playlistsOpen"
+					:name="t('Playlists')"
+					:to="{ name: 'playlists' }"
+					allow-collapse>
 					<template #icon>
 						<PlaylistPlayIcon :size="20" />
 					</template>
+					<NcAppNavigationItem
+						v-for="playlist in playlists"
+						:key="playlist.id"
+						:class="{ 'lucarne-drop-target': dropTarget === `playlist-${playlist.id}` }"
+						:name="entityTitle(playlist, 'playlist')"
+						:to="{ name: 'playlist', params: { id: playlist.id } }"
+						v-on="playlist.kind === 'personal' ? playlistDropEvents(playlist) : {}">
+						<template #icon>
+							<PlaylistPlayIcon v-if="playlist.kind === 'personal'" :size="20" />
+							<YoutubeIcon v-else :size="20" />
+						</template>
+					</NcAppNavigationItem>
 				</NcAppNavigationItem>
 				<NcAppNavigationItem :name="t('History')" :to="{ name: 'history' }">
 					<template #icon>
@@ -105,9 +126,14 @@ import HistoryIcon from 'vue-material-design-icons/History.vue'
 import HomeIcon from 'vue-material-design-icons/Home.vue'
 import PlaylistPlayIcon from 'vue-material-design-icons/PlaylistPlay.vue'
 import ShieldAccountIcon from 'vue-material-design-icons/ShieldAccount.vue'
+import YoutubeIcon from 'vue-material-design-icons/Youtube.vue'
 import YoutubeSubscriptionIcon from 'vue-material-design-icons/YoutubeSubscription.vue'
+import { send } from './api.js'
+import { CHANNEL_DRAG_TYPE, VIDEO_DRAG_TYPE } from './drag.js'
+import { entityTitle } from './format.js'
 import { t } from './i18n.js'
-import { ensureBootstrap, state } from './store.js'
+import { notify, notifyError } from './notify.js'
+import { catalogMembershipsChanged, ensureBootstrap, loadPlaylists, playlistContentChanged, state } from './store.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -115,21 +141,98 @@ const router = useRouter()
 const ready = ref(false)
 const failure = ref('')
 const catalogsOpen = ref(true)
+const playlistsOpen = ref(false)
 const search = ref('')
+const dropTarget = ref('')
 
 const catalogs = computed(() => state.bootstrap?.catalogs || [])
+const playlists = computed(() => state.playlists)
 const isAdmin = computed(() => Boolean(state.bootstrap?.is_admin))
 const isVideoList = computed(() => ['home', 'catalog', 'uncategorized'].includes(String(route.name)))
+
+// Dropping an item on an entry of the navigation adds it there, without leaving its other places.
+function allowDrop(event, type) {
+	if (event.dataTransfer?.types.includes(type)) {
+		event.preventDefault()
+		event.dataTransfer.dropEffect = 'copy'
+	}
+}
+
+function leaveDrop(key, event) {
+	if (!event.currentTarget.contains(event.relatedTarget)) {
+		dropTarget.value = dropTarget.value === key ? '' : dropTarget.value
+	}
+}
+
+async function dropChannel(catalog, event) {
+	dropTarget.value = ''
+	const payload = event.dataTransfer?.getData(CHANNEL_DRAG_TYPE)
+	if (!payload) {
+		return
+	}
+	const channel = JSON.parse(payload)
+	try {
+		const result = await send('PUT', `api/catalogs/${catalog.id}/channels/${channel.id}`)
+		const names = { channel: channel.title, catalog: catalog.name }
+		if (result.added) {
+			catalogMembershipsChanged()
+			notify(t('"{channel}" added to the catalogue "{catalog}"', names))
+		} else {
+			notifyError(t('"{channel}" is already in the catalogue "{catalog}"', names))
+		}
+	} catch (error) {
+		notifyError(error)
+	}
+}
+
+async function dropVideo(playlist, event) {
+	dropTarget.value = ''
+	const payload = event.dataTransfer?.getData(VIDEO_DRAG_TYPE)
+	if (!payload) {
+		return
+	}
+	const video = JSON.parse(payload)
+	try {
+		const result = await send('POST', `api/playlists/${playlist.id}/videos`, { video_id: video.id })
+		const names = { video: video.title, playlist: entityTitle(playlist, 'playlist') }
+		if (result.added) {
+			playlistContentChanged()
+			notify(t('"{video}" added to the playlist "{playlist}"', names))
+		} else {
+			notifyError(t('"{video}" is already in the playlist "{playlist}"', names))
+		}
+	} catch (error) {
+		notifyError(error)
+	}
+}
+
+// Only the playlists of the user accept videos: those imported from YouTube are filled by the agent.
+function playlistDropEvents(playlist) {
+	const key = `playlist-${playlist.id}`
+	return {
+		dragover: (event) => allowDrop(event, VIDEO_DRAG_TYPE),
+		dragenter: () => { dropTarget.value = key },
+		dragleave: (event) => leaveDrop(key, event),
+		drop: (event) => {
+			event.preventDefault()
+			dropVideo(playlist, event)
+		},
+	}
+}
 
 onMounted(async () => {
 	try {
 		await ensureBootstrap()
+		await loadPlaylists()
 		await router.isReady()
 		ready.value = true
 	} catch (error) {
 		failure.value = error.message
 	}
 })
+
+// The playlists of the navigation follow the pages: they are created, renamed and imported in the background.
+watch(() => route.fullPath, () => { loadPlaylists().catch(() => {}) })
 
 // Keep the navigation search field in sync with the address, and the other way round.
 watch(() => route.query.search, (value) => { search.value = String(value || '') }, { immediate: true })
@@ -149,6 +252,20 @@ onBeforeUnmount(() => clearTimeout(searchTimer))
 </script>
 
 <style>
+/* Page with a footer drawn over its bottom edge, like the zone to drop an item on to remove it. */
+.lucarne-page-frame {
+	position: relative;
+	height: 100%;
+}
+
+/* Catalogue of the navigation under a dragged subscription. */
+.lucarne-drop-target {
+	border-radius: var(--border-radius-element);
+	outline: 2px dashed var(--color-primary-element);
+	outline-offset: -2px;
+	background-color: var(--color-background-hover);
+}
+
 /* Footer of the navigation: same rules as the Files app, so that it is never squeezed. */
 .app-navigation-entry__settings {
 	flex: 0 0 auto;

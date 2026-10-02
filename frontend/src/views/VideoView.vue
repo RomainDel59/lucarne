@@ -20,6 +20,7 @@
 					</template>
 					{{ t('Delete') }}
 				</NcButton>
+				<YoutubeLink :url="data.video.webpage_url" />
 			</template>
 		</PageHeader>
 		<NcLoadingIcon v-if="loading && !data" :size="44" />
@@ -127,6 +128,7 @@ import { apiUrl, request, send } from '../api.js'
 import PageHeader from '../components/PageHeader.vue'
 import PlaybackDialog from '../components/PlaybackDialog.vue'
 import SelectField from '../components/SelectField.vue'
+import YoutubeLink from '../components/YoutubeLink.vue'
 import { useAsync } from '../composables/useAsync.js'
 import { confirm } from '../dialogs.js'
 import { formatDate, formatDuration } from '../format.js'

@@ -31,6 +31,11 @@ class PlaylistVideoRequest(BaseModel):
     url: str | None = Field(default=None, max_length=2048)
 
 
+class PlaylistMoveRequest(BaseModel):
+    target_video_id: int
+    after: bool = False
+
+
 class RetentionRequest(BaseModel):
     retained: bool
 

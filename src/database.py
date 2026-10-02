@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 SCHEMA = """
@@ -169,6 +169,7 @@ CREATE TABLE IF NOT EXISTS candidates (
     youtube_id TEXT NOT NULL,
     priority INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'pending',
+    source_rank INTEGER,
     created_at INTEGER NOT NULL,
     UNIQUE (user_id, source_type, source_id, youtube_id)
 );
@@ -242,6 +243,9 @@ class Database:
                 if version == 2:
                     connection.execute("ALTER TABLE instance_settings ADD COLUMN metadata_language TEXT")
                     version = 3
+                if version == 3:
+                    connection.execute("ALTER TABLE candidates ADD COLUMN source_rank INTEGER")
+                    version = 4
                 if version != SCHEMA_VERSION:
                     raise RuntimeError(f"Unsupported database schema version: {row['version']}")
                 if int(row["version"]) != SCHEMA_VERSION:
