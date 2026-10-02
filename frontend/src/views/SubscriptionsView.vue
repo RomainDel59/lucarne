@@ -1,29 +1,38 @@
 <template>
-	<div ref="pageElement" class="lucarne-page" @dragstart="dragging = true" @dragend="dragging = false">
-		<PageHeader :title="t('Subscriptions')">
-			<ToolbarMenu v-model="catalog" :options="catalogOptions" :label="t('Catalogue')" :icon="FilterVariantIcon" />
-				<ToolbarMenu v-model="sort" :options="sortOptions" :label="t('Sort')" :icon="SortIcon" />
-			<NcButton variant="primary" @click="adding = true">
+	<div class="lucarne-subscriptions" @dragstart="dragging = true" @dragend="dragging = false">
+		<div ref="pageElement" class="lucarne-page">
+			<PageHeader :title="t('Subscriptions')">
+				<ToolbarMenu v-model="catalog" :options="catalogOptions" :label="t('Catalogue')" :icon="FilterVariantIcon" />
+					<ToolbarMenu v-model="sort" :options="sortOptions" :label="t('Sort')" :icon="SortIcon" />
+				<NcButton variant="primary" @click="adding = true">
+					<template #icon>
+						<PlusIcon :size="20" />
+					</template>
+					{{ t('Add') }}
+				</NcButton>
+			</PageHeader>
+			<NcLoadingIcon v-if="loading && !data" :size="44" />
+			<NcEmptyContent v-else-if="error" :name="t('Something went wrong')" :description="error.message">
 				<template #icon>
-					<PlusIcon :size="20" />
-				</template>
-				{{ t('Add') }}
-			</NcButton>
-		</PageHeader>
-		<NcLoadingIcon v-if="loading && !data" :size="44" />
-		<NcEmptyContent v-else-if="error" :name="t('Something went wrong')" :description="error.message">
-			<template #icon>
-				<AlertCircleIcon />
-			</template>
-		</NcEmptyContent>
-		<template v-else-if="data">
-			<EntityGrid v-if="channels.length" :items="channels" type="channel" :page="page" :page-size="pageSize" @change="goTo" />
-			<NcEmptyContent v-else :name="t('No subscriptions')" :description="t('Add a YouTube channel to follow its videos.')">
-				<template #icon>
-					<YoutubeSubscriptionIcon />
+					<AlertCircleIcon />
 				</template>
 			</NcEmptyContent>
-		</template>
+			<template v-else-if="data">
+				<EntityGrid v-if="channels.length" :items="channels" type="channel" :page="page" :page-size="pageSize" @change="goTo" />
+				<NcEmptyContent v-else :name="t('No subscriptions')" :description="t('Add a YouTube channel to follow its videos.')">
+					<template #icon>
+						<YoutubeSubscriptionIcon />
+					</template>
+				</NcEmptyContent>
+			</template>
+			<UrlDialog
+				v-if="adding"
+				:title="t('Add a subscription')"
+				:label="t('YouTube channel URL')"
+				:submit-label="t('Add')"
+				@submit="addChannel"
+				@close="adding = false" />
+		</div>
 		<div
 			v-if="dragging && filteredCatalog"
 			class="lucarne-remove-zone"
@@ -35,13 +44,6 @@
 			<FolderRemoveOutlineIcon :size="20" />
 			{{ t('Remove from "{catalog}"', { catalog: filteredCatalog.name }) }}
 		</div>
-		<UrlDialog
-			v-if="adding"
-			:title="t('Add a subscription')"
-			:label="t('YouTube channel URL')"
-			:submit-label="t('Add')"
-			@submit="addChannel"
-			@close="adding = false" />
 	</div>
 </template>
 
@@ -159,23 +161,28 @@ async function addChannel(url) {
 </script>
 
 <style scoped>
+.lucarne-subscriptions {
+	position: relative;
+	height: 100%;
+}
+
+/* Footer of the content area while a subscription is dragged: it does not follow the list. */
 .lucarne-remove-zone {
-	position: sticky;
-	inset-block-end: calc(var(--default-grid-baseline) * 2);
+	position: absolute;
+	inset-inline: 0;
+	inset-block-end: 0;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	gap: calc(var(--default-grid-baseline) * 2);
-	margin-block-start: calc(var(--default-grid-baseline) * 4);
-	padding: calc(var(--default-grid-baseline) * 4);
+	padding: calc(var(--default-grid-baseline) * 5);
 	color: var(--color-main-text);
 	background-color: var(--color-main-background);
-	border: 2px dashed var(--color-border-maxcontrast);
-	border-radius: var(--border-radius-container);
+	border-block-start: 2px dashed var(--color-border-maxcontrast);
 }
 
 .lucarne-remove-zone--over {
-	border-color: var(--color-primary-element);
+	border-block-start-color: var(--color-primary-element);
 	background-color: var(--color-background-hover);
 }
 </style>
