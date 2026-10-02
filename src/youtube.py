@@ -170,11 +170,12 @@ class YouTubeClient:
         if not isinstance(raw_entries, list):
             raise LucarneError("The source does not expose a usable catalogue.")
         entries = []
-        for entry in raw_entries[:count]:
+        for index, entry in enumerate(raw_entries[:count]):
             if not isinstance(entry, dict) or not VIDEO_ID.fullmatch(str(entry.get("id", ""))):
                 continue
             timestamp = entry.get("timestamp") or entry.get("release_timestamp") or 0
-            entries.append({"id": str(entry["id"]), "timestamp": int(timestamp or 0)})
+            # `rank` is the place of the entry in the source, as YouTube lists it.
+            entries.append({"id": str(entry["id"]), "timestamp": int(timestamp or 0), "rank": start + index})
         return {
             "id": data.get("id"),
             "title": data.get("title"),

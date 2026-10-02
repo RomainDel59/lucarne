@@ -34,6 +34,7 @@ from .schemas import (
     PersonalSettingsRequest,
     PlaybackUpdate,
     PlaylistCreate,
+    PlaylistMoveRequest,
     PlaylistUpdate,
     PlaylistVideoRequest,
     RetentionRequest,
@@ -395,8 +396,8 @@ async def add_playlist_video(
     if repository.playlist(uid, playlist_id)["kind"] != "personal":
         raise ConflictError("A YouTube playlist is managed by the collection agent.")
     if payload.video_id is not None:
-        repository.attach_video(uid, playlist_id, payload.video_id)
-        return {"queued": False}
+        added = repository.attach_video(uid, playlist_id, payload.video_id)
+        return {"queued": False, "added": added}
     if not payload.url:
         raise ValueError("A video identifier or URL is required.")
     job = repository.enqueue(
@@ -408,6 +409,17 @@ async def add_playlist_video(
         True,
     )
     return {"queued": True, "job": job}
+
+
+@APP.put("/api/playlists/{playlist_id}/videos/{video_id}/position")
+async def move_playlist_video(
+    playlist_id: int, video_id: int, payload: PlaylistMoveRequest, nc: Annotated[AsyncNextcloudApp, Depends(anc_app)]
+) -> dict[str, bool]:
+    uid = user_id(nc)
+    if repository.playlist(uid, playlist_id)["kind"] != "personal":
+        raise ConflictError("A YouTube playlist is managed by the collection agent.")
+    repository.move_playlist_video(uid, playlist_id, video_id, payload.target_video_id, payload.after)
+    return {"moved": True}
 
 
 @APP.delete("/api/playlists/{playlist_id}/videos/{video_id}")

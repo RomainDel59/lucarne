@@ -318,6 +318,7 @@ def test_a_database_without_the_metadata_language_is_upgraded(tmp_path: Path) ->
     with database.write() as connection:
         connection.execute("INSERT INTO instance_settings(singleton, updated_at) VALUES (1, 1)")
         connection.execute("ALTER TABLE instance_settings DROP COLUMN metadata_language")
+        connection.execute("ALTER TABLE candidates DROP COLUMN source_rank")
         connection.execute("UPDATE schema_meta SET version=2")
 
     database.initialize()
@@ -326,3 +327,55 @@ def test_a_database_without_the_metadata_language_is_upgraded(tmp_path: Path) ->
     assert not repository.has_metadata_language()
     assert repository.metadata_language() == "en"
     assert (database.one("SELECT version FROM schema_meta") or {})["version"] == SCHEMA_VERSION
+
+
+def playlist_with_videos(repository: Repository, kind_url: str | None = None) -> tuple[dict, list[dict]]:
+    playlist = repository.create_playlist("alice", "Mix", kind_url)
+    videos = [
+        repository.store_video(
+            "alice",
+            {"id": f"video_{index:02d}", "title": f"Video {index}", "timestamp": 1000 + index},
+        )
+        for index in range(4)
+    ]
+    return playlist, videos
+
+
+def playlist_order(repository: Repository, playlist_id: int) -> list[str]:
+    return [item["youtube_id"] for item in repository.videos("alice", playlist_id=playlist_id)["items"]]
+
+
+def test_a_personal_playlist_keeps_the_order_of_addition_not_the_date(repository: Repository) -> None:
+    playlist, videos = playlist_with_videos(repository)
+
+    for video in (videos[2], videos[0], videos[3]):
+        assert repository.attach_video("alice", playlist["id"], video["id"]) is True
+    assert repository.attach_video("alice", playlist["id"], videos[0]["id"]) is False
+
+    assert playlist_order(repository, playlist["id"]) == ["video_02", "video_00", "video_03"]
+
+
+def test_moving_a_video_places_it_before_or_after_another(repository: Repository) -> None:
+    playlist, videos = playlist_with_videos(repository)
+    for video in videos:
+        repository.attach_video("alice", playlist["id"], video["id"])
+
+    repository.move_playlist_video("alice", playlist["id"], videos[3]["id"], videos[0]["id"], after=False)
+    assert playlist_order(repository, playlist["id"]) == ["video_03", "video_00", "video_01", "video_02"]
+
+    repository.move_playlist_video("alice", playlist["id"], videos[3]["id"], videos[1]["id"], after=True)
+    assert playlist_order(repository, playlist["id"]) == ["video_00", "video_01", "video_03", "video_02"]
+
+    with pytest.raises(NotFoundError):
+        repository.move_playlist_video("alice", playlist["id"], videos[0]["id"], 9999, after=True)
+
+
+def test_a_youtube_playlist_follows_the_rank_given_by_youtube(repository: Repository) -> None:
+    playlist, videos = playlist_with_videos(repository, "https://www.youtube.com/playlist?list=PLabcdefghijk")
+    for rank, video in zip((3, 1, 2, 4), videos, strict=True):
+        repository.attach_video("alice", playlist["id"], video["id"], rank)
+
+    assert playlist_order(repository, playlist["id"]) == ["video_01", "video_02", "video_00", "video_03"]
+
+    repository.attach_video("alice", playlist["id"], videos[3]["id"], 1)
+    assert playlist_order(repository, playlist["id"])[0] in {"video_01", "video_03"}

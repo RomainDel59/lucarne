@@ -301,7 +301,7 @@ class Agent:
             details, unavailable = self.youtube.inspect_batch([entries[0]["id"]], language)
             for metadata in details:
                 video = self._store_metadata(user_id, metadata)
-                self.repository.attach_video(user_id, playlist_id, int(video["id"]))
+                self.repository.attach_video(user_id, playlist_id, int(video["id"]), entries[0].get("rank"))
             self._mark_unavailable(user_id, unavailable)
 
     def _inspect_single_video(self, user_id: str, url: str, playlist_id: int | None) -> None:
@@ -335,6 +335,9 @@ class Agent:
                     )
                     is None
                 )
+            if source_type == "playlist" and known and not needs_playlist_link:
+                # The video keeps the place YouTube gives it in the playlist.
+                self.repository.attach_video(user_id, source_id, int(known["id"]), entry.get("rank"))
             if not known or needs_playlist_link:
                 if not int(entry.get("timestamp") or 0):
                     entry = {**entry, "timestamp": local_priority}
@@ -374,7 +377,9 @@ class Agent:
                 channel_id = int(candidate["source_id"]) if candidate["source_type"] == "channel" else None
                 video = self._store_metadata(user_id, metadata, channel_id)
                 if candidate["source_type"] == "playlist":
-                    self.repository.attach_video(user_id, int(candidate["source_id"]), int(video["id"]))
+                    self.repository.attach_video(
+                        user_id, int(candidate["source_id"]), int(video["id"]), candidate["source_rank"]
+                    )
         self._mark_unavailable(user_id, unavailable)
         with self.db.write() as connection:
             for item in candidates:
@@ -433,10 +438,13 @@ class Agent:
         language = self.repository.metadata_language()
         data = self.youtube.discover(str(source["source_url"]), source_type, start, limit, language)
         details, unavailable = self.youtube.inspect_batch([str(item["id"]) for item in data["entries"]], language)
+        ranks = {str(item["id"]): item.get("rank") for item in data["entries"]}
         for metadata in details:
             video = self._store_metadata(user_id, metadata, int(source["id"]) if source_type == "channel" else None)
             if source_type == "playlist":
-                self.repository.attach_video(user_id, int(source["id"]), int(video["id"]))
+                self.repository.attach_video(
+                    user_id, int(source["id"]), int(video["id"]), ranks.get(str(video["youtube_id"]))
+                )
         self._mark_unavailable(user_id, unavailable)
         self._update_source(user_id, source_type, int(source["id"]), data)
 
@@ -521,11 +529,20 @@ class Agent:
     def _add_candidate(self, user_id: str, source_type: str, source_id: int, entry: dict[str, Any]) -> None:
         with self.db.write() as connection:
             connection.execute(
-                """INSERT INTO candidates(user_id,source_type,source_id,youtube_id,priority,status,created_at)
-                   VALUES (?,?,?,?,?,'pending',?)
+                """INSERT INTO candidates(user_id,source_type,source_id,youtube_id,priority,status,source_rank,created_at)
+                   VALUES (?,?,?,?,?,'pending',?,?)
                    ON CONFLICT(user_id,source_type,source_id,youtube_id) DO UPDATE SET
-                     priority=excluded.priority,status=CASE WHEN candidates.status='unavailable' THEN 'pending' ELSE candidates.status END""",
-                (user_id, source_type, source_id, str(entry["id"]), int(entry.get("timestamp") or 0), now()),
+                     priority=excluded.priority,source_rank=excluded.source_rank,
+                     status=CASE WHEN candidates.status='unavailable' THEN 'pending' ELSE candidates.status END""",
+                (
+                    user_id,
+                    source_type,
+                    source_id,
+                    str(entry["id"]),
+                    int(entry.get("timestamp") or 0),
+                    entry.get("rank"),
+                    now(),
+                ),
             )
 
     def _mark_unavailable(self, user_id: str, youtube_ids: list[str]) -> None:
