@@ -18,7 +18,11 @@
 			</div>
 			<div class="lucarne-video-card__body">
 				<span class="lucarne-video-card__title" :title="title">{{ title }}</span>
-				<span class="lucarne-video-card__meta">{{ meta }}</span>
+				<span class="lucarne-video-card__meta">
+						<span v-if="channelName" class="lucarne-video-card__channel" :title="channelName">{{ channelName }}</span>
+						<span v-if="channelName" aria-hidden="true">·</span>
+						<span class="lucarne-video-card__date">{{ date }}</span>
+					</span>
 			</div>
 		</component>
 		<NcButton
@@ -57,10 +61,8 @@ defineEmits(['remove'])
 const thumbnail = computed(() => (props.video.thumbnail_url ? apiUrl(props.video.thumbnail_url) : ''))
 const unavailable = computed(() => props.video.availability && props.video.availability !== 'available')
 const title = computed(() => props.video.title || t('Pending video'))
-const meta = computed(() => {
-	const date = formatDate(props.video.published_at || props.video.created_at)
-	return props.pending ? date : `${props.video.channel_name || t('Standalone video')} · ${date}`
-})
+const channelName = computed(() => (props.pending ? '' : props.video.channel_name || t('Standalone video')))
+const date = computed(() => formatDate(props.video.published_at || props.video.created_at))
 const progress = computed(() => {
 	const duration = Number(props.video.history_duration || 0)
 	return duration > 0 ? Math.min(100, (Number(props.video.history_position || 0) / duration) * 100) : 0
@@ -153,12 +155,21 @@ const progress = computed(() => {
 }
 
 .lucarne-video-card__meta {
-	display: -webkit-box;
+	display: flex;
+	gap: var(--default-grid-baseline);
 	margin-block-start: auto;
-	overflow: hidden;
+	white-space: nowrap;
 	color: var(--color-text-maxcontrast);
-	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 2;
+}
+
+.lucarne-video-card__channel {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.lucarne-video-card__date {
+	flex: none;
 }
 
 .lucarne-video-card__remove {
