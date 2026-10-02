@@ -152,9 +152,14 @@ async function dropChannel(catalog, event) {
 	}
 	const channel = JSON.parse(payload)
 	try {
-		await send('PUT', `api/catalogs/${catalog.id}/channels/${channel.id}`)
-		catalogMembershipsChanged()
-		notify(t('"{channel}" added to the catalogue "{catalog}"', { channel: channel.title, catalog: catalog.name }))
+		const result = await send('PUT', `api/catalogs/${catalog.id}/channels/${channel.id}`)
+		const names = { channel: channel.title, catalog: catalog.name }
+		if (result.added) {
+			catalogMembershipsChanged()
+			notify(t('"{channel}" added to the catalogue "{catalog}"', names))
+		} else {
+			notifyError(t('"{channel}" is already in the catalogue "{catalog}"', names))
+		}
 	} catch (error) {
 		notifyError(error)
 	}

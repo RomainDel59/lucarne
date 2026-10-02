@@ -39,8 +39,8 @@ def test_adding_a_channel_keeps_its_other_catalogs(repository: Repository) -> No
     music = repository.create_catalog("alice", "Music")
     repository.replace_catalog_channels("alice", history["id"], [channel["id"], other["id"]])
 
-    repository.add_channel_to_catalog("alice", music["id"], channel["id"])
-    repository.add_channel_to_catalog("alice", music["id"], channel["id"])
+    assert repository.add_channel_to_catalog("alice", music["id"], channel["id"])["added"] is True
+    assert repository.add_channel_to_catalog("alice", music["id"], channel["id"])["added"] is False
 
     assert repository.catalog("alice", music["id"])["channel_ids"] == [channel["id"]]
     assert repository.catalog("alice", history["id"])["channel_ids"] == [channel["id"], other["id"]]
