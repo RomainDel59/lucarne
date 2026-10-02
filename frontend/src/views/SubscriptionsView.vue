@@ -1,5 +1,5 @@
 <template>
-	<div class="lucarne-subscriptions" @dragstart="dragging = true" @dragend="dragging = false">
+	<div class="lucarne-page-frame">
 		<div ref="pageElement" class="lucarne-page">
 			<PageHeader :title="t('Subscriptions')">
 				<ToolbarMenu v-model="catalog" :options="catalogOptions" :label="t('Catalogue')" :icon="FilterVariantIcon" />
@@ -33,17 +33,11 @@
 				@submit="addChannel"
 				@close="adding = false" />
 		</div>
-		<div
-			v-if="dragging && filteredCatalog"
-			class="lucarne-remove-zone"
-			:class="{ 'lucarne-remove-zone--over': overRemoveZone }"
-			@dragover="allowDrop"
-			@dragenter="overRemoveZone = true"
-			@dragleave="overRemoveZone = false"
-			@drop.prevent="removeChannel">
-			<FolderRemoveOutlineIcon :size="20" />
-			{{ t('Remove from "{catalog}"', { catalog: filteredCatalog.name }) }}
-		</div>
+		<RemoveDropZone
+			v-if="filteredCatalog"
+			:type="CHANNEL_DRAG_TYPE"
+			:label="removeLabel"
+			@drop="removeChannel" />
 	</div>
 </template>
 
@@ -56,7 +50,6 @@ import { useRoute, useRouter } from 'vue-router'
 import AlertCircleIcon from 'vue-material-design-icons/AlertCircle.vue'
 import FilterVariantIcon from 'vue-material-design-icons/FilterVariant.vue'
 import FolderMultipleOutlineIcon from 'vue-material-design-icons/FolderMultipleOutline.vue'
-import FolderRemoveOutlineIcon from 'vue-material-design-icons/FolderRemoveOutline.vue'
 import FolderOffOutlineIcon from 'vue-material-design-icons/FolderOffOutline.vue'
 import FolderOutlineIcon from 'vue-material-design-icons/FolderOutline.vue'
 import PlusIcon from 'vue-material-design-icons/Plus.vue'
@@ -67,6 +60,7 @@ import YoutubeSubscriptionIcon from 'vue-material-design-icons/YoutubeSubscripti
 import { request, send } from '../api.js'
 import EntityGrid from '../components/EntityGrid.vue'
 import PageHeader from '../components/PageHeader.vue'
+import RemoveDropZone from '../components/RemoveDropZone.vue'
 import ToolbarMenu from '../components/ToolbarMenu.vue'
 import UrlDialog from '../components/UrlDialog.vue'
 import { CHANNEL_DRAG_TYPE } from '../drag.js'
@@ -80,8 +74,6 @@ const route = useRoute()
 const router = useRouter()
 const adding = ref(false)
 const pageElement = ref(null)
-const dragging = ref(false)
-const overRemoveZone = ref(false)
 // Compact tiles: six rows take about the height of two rows of video tiles.
 const { pageSize, page, goTo, settle } = usePagedGrid(pageElement, 6)
 
@@ -101,6 +93,7 @@ const catalogOptions = computed(() => [
 ])
 // The zone to drop a subscription on only exists when the list is filtered on one catalogue.
 const filteredCatalog = computed(() => state.bootstrap.catalogs.find((item) => String(item.id) === catalog.value) || null)
+const removeLabel = computed(() => t('Remove from "{catalog}"', { catalog: filteredCatalog.value?.name || '' }))
 const sortOptions = [
 	{ id: 'alpha', label: t('Alphabetical order'), icon: SortAlphabeticalAscendingIcon },
 	{ id: 'recent', label: t('Latest video'), icon: SortClockDescendingIcon },
@@ -124,22 +117,8 @@ const channels = computed(() => {
 
 watch(() => [pageSize.value, channels.value.length], () => settle(channels.value.length))
 
-function allowDrop(event) {
-	if (event.dataTransfer?.types.includes(CHANNEL_DRAG_TYPE)) {
-		event.preventDefault()
-		event.dataTransfer.dropEffect = 'move'
-	}
-}
-
-async function removeChannel(event) {
-	dragging.value = false
-	overRemoveZone.value = false
-	const payload = event.dataTransfer?.getData(CHANNEL_DRAG_TYPE)
+async function removeChannel(channel) {
 	const target = filteredCatalog.value
-	if (!payload || !target) {
-		return
-	}
-	const channel = JSON.parse(payload)
 	try {
 		await send('DELETE', `api/catalogs/${target.id}/channels/${channel.id}`)
 		catalogMembershipsChanged()
@@ -159,30 +138,3 @@ async function addChannel(url) {
 	}
 }
 </script>
-
-<style scoped>
-.lucarne-subscriptions {
-	position: relative;
-	height: 100%;
-}
-
-/* Footer of the content area while a subscription is dragged: it does not follow the list. */
-.lucarne-remove-zone {
-	position: absolute;
-	inset-inline: 0;
-	inset-block-end: 0;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	gap: calc(var(--default-grid-baseline) * 2);
-	padding: calc(var(--default-grid-baseline) * 5);
-	color: var(--color-main-text);
-	background-color: var(--color-main-background);
-	border-block-start: 2px dashed var(--color-border-maxcontrast);
-}
-
-.lucarne-remove-zone--over {
-	border-block-start-color: var(--color-primary-element);
-	background-color: var(--color-background-hover);
-}
-</style>
