@@ -469,7 +469,10 @@ class Agent:
 
     def _update_source(self, user_id: str, source_type: str, source_id: int, data: dict[str, Any]) -> None:
         timestamp = now()
-        title = str(data.get("channel") or data.get("uploader") or data.get("title") or "")[:255]
+        # A channel is named after its author, but YouTube gives a playlist the name of its owner in the same
+        # fields: a playlist keeps its own title.
+        names = ("channel", "uploader", "title") if source_type == "channel" else ("title", "channel", "uploader")
+        title = str(next((data[name] for name in names if data.get(name)), ""))[:255]
         image_file = None
         has_remote_image = bool(data.get("image_url"))
         if has_remote_image:
