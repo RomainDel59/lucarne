@@ -17,8 +17,13 @@
 					<NcAppNavigationItem
 						v-for="catalog in catalogs"
 						:key="catalog.id"
+						:class="{ 'lucarne-drop-target': dropTarget === catalog.id }"
 						:name="catalog.name"
-						:to="{ name: 'catalog', params: { id: catalog.id } }">
+						:to="{ name: 'catalog', params: { id: catalog.id } }"
+						@dragover="allowDrop"
+						@dragenter="dropTarget = catalog.id"
+						@dragleave="leaveDrop(catalog.id, $event)"
+						@drop.prevent="dropChannel(catalog, $event)">
 						<template #icon>
 							<FolderOutlineIcon :size="20" />
 						</template>
@@ -106,8 +111,11 @@ import HomeIcon from 'vue-material-design-icons/Home.vue'
 import PlaylistPlayIcon from 'vue-material-design-icons/PlaylistPlay.vue'
 import ShieldAccountIcon from 'vue-material-design-icons/ShieldAccount.vue'
 import YoutubeSubscriptionIcon from 'vue-material-design-icons/YoutubeSubscription.vue'
+import { send } from './api.js'
+import { CHANNEL_DRAG_TYPE } from './drag.js'
 import { t } from './i18n.js'
-import { ensureBootstrap, state } from './store.js'
+import { notify, notifyError } from './notify.js'
+import { catalogMembershipsChanged, ensureBootstrap, state } from './store.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -116,10 +124,41 @@ const ready = ref(false)
 const failure = ref('')
 const catalogsOpen = ref(true)
 const search = ref('')
+const dropTarget = ref(null)
 
 const catalogs = computed(() => state.bootstrap?.catalogs || [])
 const isAdmin = computed(() => Boolean(state.bootstrap?.is_admin))
 const isVideoList = computed(() => ['home', 'catalog', 'uncategorized'].includes(String(route.name)))
+
+// Dropping a subscription on a catalogue of the navigation adds it there, without leaving its other catalogues.
+function allowDrop(event) {
+	if (event.dataTransfer?.types.includes(CHANNEL_DRAG_TYPE)) {
+		event.preventDefault()
+		event.dataTransfer.dropEffect = 'copy'
+	}
+}
+
+function leaveDrop(id, event) {
+	if (!event.currentTarget.contains(event.relatedTarget)) {
+		dropTarget.value = dropTarget.value === id ? null : dropTarget.value
+	}
+}
+
+async function dropChannel(catalog, event) {
+	dropTarget.value = null
+	const payload = event.dataTransfer?.getData(CHANNEL_DRAG_TYPE)
+	if (!payload) {
+		return
+	}
+	const channel = JSON.parse(payload)
+	try {
+		await send('PUT', `api/catalogs/${catalog.id}/channels/${channel.id}`)
+		catalogMembershipsChanged()
+		notify(t('"{channel}" added to the catalogue "{catalog}"', { channel: channel.title, catalog: catalog.name }))
+	} catch (error) {
+		notifyError(error)
+	}
+}
 
 onMounted(async () => {
 	try {
@@ -149,6 +188,14 @@ onBeforeUnmount(() => clearTimeout(searchTimer))
 </script>
 
 <style>
+/* Catalogue of the navigation under a dragged subscription. */
+.lucarne-drop-target {
+	border-radius: var(--border-radius-element);
+	outline: 2px dashed var(--color-primary-element);
+	outline-offset: -2px;
+	background-color: var(--color-background-hover);
+}
+
 /* Footer of the navigation: same rules as the Files app, so that it is never squeezed. */
 .app-navigation-entry__settings {
 	flex: 0 0 auto;

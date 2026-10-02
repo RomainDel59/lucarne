@@ -1,5 +1,5 @@
 <template>
-	<NcListItem :name="title" :to="to" :details="status">
+	<NcListItem :name="title" :to="to" :details="status" :draggable="type === 'channel'" @dragstart="startDrag">
 		<template #name>
 			<span :title="title">{{ title }}</span>
 		</template>
@@ -25,6 +25,7 @@ import NcListItem from '@nextcloud/vue/components/NcListItem'
 import { computed } from 'vue'
 import { apiUrl } from '../api.js'
 import { entityTitle, formatDate } from '../format.js'
+import { CHANNEL_DRAG_TYPE } from '../drag.js'
 import { t } from '../i18n.js'
 
 const props = defineProps({
@@ -40,6 +41,14 @@ const subtitle = computed(() => {
 	const count = Number(props.item.video_count || 0)
 	return count ? t('{count} videos · {date}', { count, date: formatDate(props.item.latest_published_at) }) : t('No videos')
 })
+function startDrag(event) {
+	if (props.type !== 'channel') {
+		return
+	}
+	event.dataTransfer.effectAllowed = 'copy'
+	event.dataTransfer.setData(CHANNEL_DRAG_TYPE, JSON.stringify({ id: props.item.id, title: title.value }))
+}
+
 const status = computed(() => {
 	if (['pending', 'initializing', 'syncing'].includes(props.item.sync_status)) {
 		return t('Initialization pending')

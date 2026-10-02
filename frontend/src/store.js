@@ -2,7 +2,7 @@ import { reactive } from 'vue'
 import { request } from './api.js'
 import { i18n } from './i18n.js'
 
-export const state = reactive({ bootstrap: null })
+export const state = reactive({ bootstrap: null, catalogRevision: 0 })
 
 export async function loadBootstrap() {
 	const data = await request('api/bootstrap')
@@ -13,6 +13,11 @@ export async function loadBootstrap() {
 
 export function setCatalogs(catalogs) {
 	state.bootstrap.catalogs = catalogs
+}
+
+/** Tell the lists that depend on catalogue memberships that they changed. */
+export function catalogMembershipsChanged() {
+	state.catalogRevision++
 }
 
 let pending = null

@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from src.database import SCHEMA_VERSION, Database
+from src.errors import NotFoundError
 from src.repository import Repository
 
 
@@ -29,6 +30,24 @@ def test_catalog_names_are_unique_without_changing_case(repository: Repository) 
         assert "already exists" in str(error)
     else:
         raise AssertionError("Case-insensitive duplicate should fail")
+
+
+def test_adding_a_channel_keeps_its_other_catalogs(repository: Repository) -> None:
+    channel = repository.create_channel("alice", "https://www.youtube.com/@alice/videos")
+    other = repository.create_channel("alice", "https://www.youtube.com/@other/videos")
+    history = repository.create_catalog("alice", "History")
+    music = repository.create_catalog("alice", "Music")
+    repository.replace_catalog_channels("alice", history["id"], [channel["id"], other["id"]])
+
+    repository.add_channel_to_catalog("alice", music["id"], channel["id"])
+    repository.add_channel_to_catalog("alice", music["id"], channel["id"])
+
+    assert repository.catalog("alice", music["id"])["channel_ids"] == [channel["id"]]
+    assert repository.catalog("alice", history["id"])["channel_ids"] == [channel["id"], other["id"]]
+
+    bob_channel = repository.create_channel("bob", "https://www.youtube.com/@bob/videos")
+    with pytest.raises(NotFoundError):
+        repository.add_channel_to_catalog("alice", music["id"], bob_channel["id"])
 
 
 def test_catalog_memberships_cannot_cross_users(repository: Repository) -> None:

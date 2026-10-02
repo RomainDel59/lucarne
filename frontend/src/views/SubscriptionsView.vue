@@ -93,7 +93,7 @@ const { data, loading, error, reload } = useAsync(() => {
 	}
 	const filter = catalog.value === 'uncategorized' ? '?uncategorized=true' : catalog.value !== 'all' ? `?catalog_id=${catalog.value}` : ''
 	return request(`api/channels${filter}`)
-}, () => [route.name, route.query.catalog])
+}, () => [route.name, route.query.catalog, state.catalogRevision])
 
 const channels = computed(() => {
 	const list = [...(data.value || [])]

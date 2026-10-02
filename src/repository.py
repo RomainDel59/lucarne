@@ -574,6 +574,18 @@ class Repository:
             )
         return self.catalog(user_id, catalog_id)
 
+    def add_channel_to_catalog(self, user_id: str, catalog_id: int, channel_id: int) -> dict[str, Any]:
+        """Add one channel to a catalogue, keeping its other memberships; adding it twice changes nothing."""
+        self.catalog(user_id, catalog_id)
+        if not self.db.one("SELECT id FROM channels WHERE id=? AND user_id=?", (channel_id, user_id)):
+            raise NotFoundError("Channel not found.")
+        with self.db.write() as connection:
+            connection.execute(
+                "INSERT OR IGNORE INTO channel_catalog_memberships(catalog_id,channel_id) VALUES (?,?)",
+                (catalog_id, channel_id),
+            )
+        return self.catalog(user_id, catalog_id)
+
     def delete_catalog(self, user_id: str, catalog_id: int) -> None:
         self.catalog(user_id, catalog_id)
         with self.db.write() as connection:
