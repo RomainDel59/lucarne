@@ -586,6 +586,16 @@ class Repository:
             )
         return self.catalog(user_id, catalog_id)
 
+    def remove_channel_from_catalog(self, user_id: str, catalog_id: int, channel_id: int) -> dict[str, Any]:
+        """Remove one channel from a catalogue only; removing an absent channel changes nothing."""
+        self.catalog(user_id, catalog_id)
+        with self.db.write() as connection:
+            connection.execute(
+                "DELETE FROM channel_catalog_memberships WHERE catalog_id=? AND channel_id=?",
+                (catalog_id, channel_id),
+            )
+        return self.catalog(user_id, catalog_id)
+
     def delete_catalog(self, user_id: str, catalog_id: int) -> None:
         self.catalog(user_id, catalog_id)
         with self.db.write() as connection:

@@ -1,5 +1,5 @@
 <template>
-	<div ref="pageElement" class="lucarne-page">
+	<div ref="pageElement" class="lucarne-page" @dragstart="dragging = true" @dragend="dragging = false">
 		<PageHeader :title="t('Subscriptions')">
 			<ToolbarMenu v-model="catalog" :options="catalogOptions" :label="t('Catalogue')" :icon="FilterVariantIcon" />
 				<ToolbarMenu v-model="sort" :options="sortOptions" :label="t('Sort')" :icon="SortIcon" />
@@ -24,6 +24,17 @@
 				</template>
 			</NcEmptyContent>
 		</template>
+		<div
+			v-if="dragging && filteredCatalog"
+			class="lucarne-remove-zone"
+			:class="{ 'lucarne-remove-zone--over': overRemoveZone }"
+			@dragover="allowDrop"
+			@dragenter="overRemoveZone = true"
+			@dragleave="overRemoveZone = false"
+			@drop.prevent="removeChannel">
+			<FolderRemoveOutlineIcon :size="20" />
+			{{ t('Remove from "{catalog}"', { catalog: filteredCatalog.name }) }}
+		</div>
 		<UrlDialog
 			v-if="adding"
 			:title="t('Add a subscription')"
@@ -43,6 +54,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AlertCircleIcon from 'vue-material-design-icons/AlertCircle.vue'
 import FilterVariantIcon from 'vue-material-design-icons/FilterVariant.vue'
 import FolderMultipleOutlineIcon from 'vue-material-design-icons/FolderMultipleOutline.vue'
+import FolderRemoveOutlineIcon from 'vue-material-design-icons/FolderRemoveOutline.vue'
 import FolderOffOutlineIcon from 'vue-material-design-icons/FolderOffOutline.vue'
 import FolderOutlineIcon from 'vue-material-design-icons/FolderOutline.vue'
 import PlusIcon from 'vue-material-design-icons/Plus.vue'
@@ -55,16 +67,19 @@ import EntityGrid from '../components/EntityGrid.vue'
 import PageHeader from '../components/PageHeader.vue'
 import ToolbarMenu from '../components/ToolbarMenu.vue'
 import UrlDialog from '../components/UrlDialog.vue'
+import { CHANNEL_DRAG_TYPE } from '../drag.js'
 import { useAsync } from '../composables/useAsync.js'
 import { usePagedGrid } from '../composables/usePagedGrid.js'
 import { t } from '../i18n.js'
 import { notify, notifyError } from '../notify.js'
-import { state } from '../store.js'
+import { catalogMembershipsChanged, state } from '../store.js'
 
 const route = useRoute()
 const router = useRouter()
 const adding = ref(false)
 const pageElement = ref(null)
+const dragging = ref(false)
+const overRemoveZone = ref(false)
 // Compact tiles: six rows take about the height of two rows of video tiles.
 const { pageSize, page, goTo, settle } = usePagedGrid(pageElement, 6)
 
@@ -82,6 +97,8 @@ const catalogOptions = computed(() => [
 	...state.bootstrap.catalogs.map((item) => ({ id: String(item.id), label: item.name, icon: FolderOutlineIcon })),
 	{ id: 'uncategorized', label: t('Uncatalogued'), icon: FolderOffOutlineIcon },
 ])
+// The zone to drop a subscription on only exists when the list is filtered on one catalogue.
+const filteredCatalog = computed(() => state.bootstrap.catalogs.find((item) => String(item.id) === catalog.value) || null)
 const sortOptions = [
 	{ id: 'alpha', label: t('Alphabetical order'), icon: SortAlphabeticalAscendingIcon },
 	{ id: 'recent', label: t('Latest video'), icon: SortClockDescendingIcon },
@@ -105,6 +122,31 @@ const channels = computed(() => {
 
 watch(() => [pageSize.value, channels.value.length], () => settle(channels.value.length))
 
+function allowDrop(event) {
+	if (event.dataTransfer?.types.includes(CHANNEL_DRAG_TYPE)) {
+		event.preventDefault()
+		event.dataTransfer.dropEffect = 'move'
+	}
+}
+
+async function removeChannel(event) {
+	dragging.value = false
+	overRemoveZone.value = false
+	const payload = event.dataTransfer?.getData(CHANNEL_DRAG_TYPE)
+	const target = filteredCatalog.value
+	if (!payload || !target) {
+		return
+	}
+	const channel = JSON.parse(payload)
+	try {
+		await send('DELETE', `api/catalogs/${target.id}/channels/${channel.id}`)
+		catalogMembershipsChanged()
+		notify(t('"{channel}" removed from the catalogue "{catalog}"', { channel: channel.title, catalog: target.name }))
+	} catch (error) {
+		notifyError(error)
+	}
+}
+
 async function addChannel(url) {
 	try {
 		await send('POST', 'api/channels', { url })
@@ -116,3 +158,24 @@ async function addChannel(url) {
 }
 </script>
 
+<style scoped>
+.lucarne-remove-zone {
+	position: sticky;
+	inset-block-end: calc(var(--default-grid-baseline) * 2);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: calc(var(--default-grid-baseline) * 2);
+	margin-block-start: calc(var(--default-grid-baseline) * 4);
+	padding: calc(var(--default-grid-baseline) * 4);
+	color: var(--color-main-text);
+	background-color: var(--color-main-background);
+	border: 2px dashed var(--color-border-maxcontrast);
+	border-radius: var(--border-radius-container);
+}
+
+.lucarne-remove-zone--over {
+	border-color: var(--color-primary-element);
+	background-color: var(--color-background-hover);
+}
+</style>

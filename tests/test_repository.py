@@ -50,6 +50,20 @@ def test_adding_a_channel_keeps_its_other_catalogs(repository: Repository) -> No
         repository.add_channel_to_catalog("alice", music["id"], bob_channel["id"])
 
 
+def test_removing_a_channel_keeps_its_other_catalogs(repository: Repository) -> None:
+    channel = repository.create_channel("alice", "https://www.youtube.com/@alice/videos")
+    history = repository.create_catalog("alice", "History")
+    music = repository.create_catalog("alice", "Music")
+    repository.replace_catalog_channels("alice", history["id"], [channel["id"]])
+    repository.replace_catalog_channels("alice", music["id"], [channel["id"]])
+
+    repository.remove_channel_from_catalog("alice", music["id"], channel["id"])
+    repository.remove_channel_from_catalog("alice", music["id"], channel["id"])
+
+    assert repository.catalog("alice", music["id"])["channel_ids"] == []
+    assert repository.catalog("alice", history["id"])["channel_ids"] == [channel["id"]]
+
+
 def test_catalog_memberships_cannot_cross_users(repository: Repository) -> None:
     alice_channel = repository.create_channel("alice", "https://www.youtube.com/@alice/videos")
     bob_channel = repository.create_channel("bob", "https://www.youtube.com/@bob/videos")

@@ -457,6 +457,13 @@ async def add_channel_to_catalog(
     return repository.add_channel_to_catalog(user_id(nc), catalog_id, channel_id)
 
 
+@APP.delete("/api/catalogs/{catalog_id}/channels/{channel_id}")
+async def remove_channel_from_catalog(
+    catalog_id: int, channel_id: int, nc: Annotated[AsyncNextcloudApp, Depends(anc_app)]
+) -> dict[str, Any]:
+    return repository.remove_channel_from_catalog(user_id(nc), catalog_id, channel_id)
+
+
 @APP.delete("/api/catalogs/{catalog_id}")
 async def delete_catalog(catalog_id: int, nc: Annotated[AsyncNextcloudApp, Depends(anc_app)]) -> dict[str, bool]:
     repository.delete_catalog(user_id(nc), catalog_id)

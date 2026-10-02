@@ -45,7 +45,7 @@ function startDrag(event) {
 	if (props.type !== 'channel') {
 		return
 	}
-	event.dataTransfer.effectAllowed = 'copy'
+	event.dataTransfer.effectAllowed = 'copyMove'
 	event.dataTransfer.setData(CHANNEL_DRAG_TYPE, JSON.stringify({ id: props.item.id, title: title.value }))
 }
 

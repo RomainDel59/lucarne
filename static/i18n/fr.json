@@ -31,6 +31,8 @@
   "Catalogue": "Catalogue",
   "Catalogue channels": "Chaînes du catalogue",
   "Catalogue saved": "Catalogue enregistré",
+  "Remove from \"{catalog}\"": "Retirer de « {catalog} »",
+  "\"{channel}\" removed from the catalogue \"{catalog}\"": "« {channel} » retirée du catalogue « {catalog} »",
   "\"{channel}\" added to the catalogue \"{catalog}\"": "« {channel} » ajoutée au catalogue « {catalog} »",
   "Channel catalogues": "Catalogues de chaînes",
   "Clear": "Effacer",
