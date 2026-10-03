@@ -590,7 +590,8 @@ def asset_path(kind: str, uid: str, identifier: int) -> Path:
             return settings.playlist_images / str(row["image_file"])
         first = database.one(
             """SELECT v.thumbnail_file FROM playlist_videos pv JOIN videos v ON v.id=pv.video_id
-               WHERE pv.playlist_id=? AND v.user_id=? ORDER BY pv.position,pv.added_at LIMIT 1""",
+               WHERE pv.playlist_id=? AND v.user_id=? AND v.availability!='skipped'
+               ORDER BY pv.position,pv.added_at LIMIT 1""",
             (identifier, uid),
         )
         return settings.thumbnails / str((first or {}).get("thumbnail_file") or "")

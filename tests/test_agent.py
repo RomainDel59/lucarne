@@ -7,7 +7,7 @@ import pytest
 
 from src.agent import Agent
 from src.database import Database
-from src.errors import LucarneError
+from src.errors import LucarneError, VideoUnavailableError
 from src.repository import Repository, now
 
 
@@ -216,3 +216,188 @@ def test_a_playlist_keeps_its_own_title_but_a_channel_takes_its_author_name(
 
     assert repository.playlist("alice", int(playlist["id"]))["title"] == "My playlist"
     assert repository.channel("alice", int(channel["id"]))["title"] == "Alice Owner"
+
+
+PRIVATE = {"id": "video_01", "reason": "Private video", "known": True, "temporary": False, "retry_after": None}
+UNKNOWN = {"id": "video_03", "reason": "Something odd", "known": False, "temporary": False, "retry_after": None}
+
+
+class FlakyYouTube:
+    """Five videos of a channel: the second is private and the fourth fails for an unknown reason."""
+
+    def discover(self, value: str, source_type: str, start: int, count: int, language: str) -> dict:
+        return {
+            "id": "UCchannel123",
+            "channel": "Example channel",
+            "entries": [{"id": f"video_{index:02d}", "timestamp": 1000 + index, "rank": start + index} for index in range(5)],
+            "has_more": True,
+            "next_offset": start - 1 + 5,
+            "source_url": value,
+            "image_url": None,
+        }
+
+    def inspect_batch(self, video_ids: list[str], language: str) -> tuple[list[dict], list[dict]]:
+        failing = {"video_01": PRIVATE, "video_03": UNKNOWN}
+        details = [
+            {
+                "id": video_id,
+                "title": f"Title {video_id}",
+                "channel": "Example channel",
+                "channel_id": "UCchannel123",
+                "upload_date": "20260928",
+                "duration": 10,
+            }
+            for video_id in video_ids
+            if video_id not in failing
+        ]
+        return details, [failing[video_id] for video_id in video_ids if video_id in failing]
+
+    def inspect_video(self, value: str, language: str) -> dict:
+        raise VideoUnavailableError("Privée", "Private video")
+
+
+def hidden_rows(database: Database) -> list[tuple[str, int, bool]]:
+    rows = database.all("SELECT youtube_id,skip_attempts,retry_at FROM videos WHERE availability='skipped' ORDER BY id")
+    return [(row["youtube_id"], row["skip_attempts"], row["retry_at"] is not None) for row in rows]
+
+
+def test_a_video_that_fails_neither_stops_its_batch_nor_blocks_the_history(
+    database: Database, repository: Repository, tmp_path: Path
+) -> None:
+    channel = repository.create_channel("alice", "https://www.youtube.com/@example/videos")
+    agent = make_agent(database, repository, tmp_path)
+    agent.youtube = FlakyYouTube()
+
+    agent._history("alice", "channel", int(channel["id"]), 5)
+
+    visible = repository.videos("alice", channel_id=channel["id"])
+    assert sorted(item["youtube_id"] for item in visible["items"]) == ["video_00", "video_02", "video_04"]
+    assert hidden_rows(database) == [("video_01", 1, False), ("video_03", 1, True)]
+    assert repository.channel("alice", channel["id"])["catalog_offset"] == 5
+    assert repository.channels("alice")[0]["video_count"] == 3
+
+
+def test_a_playlist_keeps_the_place_of_a_video_that_cannot_be_read(
+    database: Database, repository: Repository, tmp_path: Path
+) -> None:
+    playlist = repository.create_playlist("alice", "Mix", "https://www.youtube.com/playlist?list=PLabcdefghijk")
+    agent = make_agent(database, repository, tmp_path)
+    agent.youtube = FlakyYouTube()
+
+    agent._history("alice", "playlist", int(playlist["id"]), 5)
+
+    links = database.all(
+        "SELECT v.youtube_id, pv.position FROM playlist_videos pv JOIN videos v ON v.id=pv.video_id WHERE pv.playlist_id=? ORDER BY pv.position",
+        (playlist["id"],),
+    )
+    assert [(row["youtube_id"], row["position"]) for row in links] == [(f"video_{index:02d}", index + 1) for index in range(5)]
+    assert [item["youtube_id"] for item in repository.videos("alice", playlist_id=playlist["id"])["items"]] == [
+        "video_00",
+        "video_02",
+        "video_04",
+    ]
+    assert repository.playlists("alice")[0]["video_count"] == 3
+
+
+def test_the_metadata_phase_records_the_videos_it_cannot_read(
+    database: Database, repository: Repository, tmp_path: Path
+) -> None:
+    channel = repository.create_channel("alice", "https://www.youtube.com/@example/videos")
+    with database.write() as connection:
+        connection.executemany(
+            """INSERT INTO candidates(user_id,source_type,source_id,youtube_id,priority,status,source_rank,created_at)
+               VALUES ('alice','channel',?,?,0,'pending',NULL,?)""",
+            [(channel["id"], f"video_{index:02d}", now()) for index in range(5)],
+        )
+    ids = [row["id"] for row in database.all("SELECT id FROM candidates")]
+    agent = make_agent(database, repository, tmp_path)
+    agent.youtube = FlakyYouTube()
+
+    agent._process_candidates("alice", ids)
+
+    assert len(repository.videos("alice")["items"]) == 3
+    assert hidden_rows(database) == [("video_01", 1, False), ("video_03", 1, True)]
+    assert {row["status"] for row in database.all("SELECT status FROM candidates")} == {"done"}
+
+
+def test_a_video_added_by_hand_that_cannot_be_read_is_recorded_without_failing(
+    database: Database, repository: Repository, tmp_path: Path
+) -> None:
+    agent = make_agent(database, repository, tmp_path)
+    agent.youtube = FlakyYouTube()
+
+    agent._inspect_single_video("alice", "https://www.youtube.com/watch?v=video_01", None)
+
+    assert hidden_rows(database) == [("video_01", 1, False)]
+
+
+def test_a_video_whose_time_has_come_is_read_again_and_shown_when_it_works(
+    database: Database, repository: Repository, tmp_path: Path
+) -> None:
+    channel = repository.create_channel("alice", "https://www.youtube.com/@example/videos")
+    repository.record_unreadable_video("alice", UNKNOWN, channel["id"], "Example channel")
+    with database.write() as connection:
+        connection.execute("UPDATE videos SET retry_at=1")
+    agent = make_agent(database, repository, tmp_path)
+    agent.youtube = SimpleNamespace(
+        inspect_batch=lambda ids, language: (
+            [{"id": ids[0], "title": "Back", "channel": "Example channel", "upload_date": "20260928", "duration": 10}],
+            [],
+        )
+    )
+
+    agent._plan_retries("alice")
+    agent._plan_retries("alice")
+    jobs = database.all("SELECT * FROM agent_jobs WHERE type='retry_videos'")
+    assert len(jobs) == 1 and repository.job("alice", jobs[0]["id"])["payload"] == {"youtube_ids": ["video_03"]}
+
+    agent._execute("alice", "retry_videos", None, None, {"youtube_ids": ["video_03"]})
+
+    video = repository.videos("alice", channel_id=channel["id"])["items"][0]
+    assert (video["youtube_id"], video["title"], video["availability"], video["channel_id"]) == (
+        "video_03",
+        "Back",
+        "available",
+        channel["id"],
+    )
+    assert hidden_rows(database) == []
+
+
+def test_a_video_that_still_fails_when_tried_again_is_scheduled_again(
+    database: Database, repository: Repository, tmp_path: Path
+) -> None:
+    repository.record_unreadable_video("alice", UNKNOWN)
+    agent = make_agent(database, repository, tmp_path)
+    agent.youtube = FlakyYouTube()
+
+    agent._retry_videos("alice", ["video_03"])
+
+    assert hidden_rows(database) == [("video_03", 2, True)]
+
+
+def test_a_channel_whose_first_video_cannot_be_read_is_still_subscribed(
+    database: Database, repository: Repository, tmp_path: Path
+) -> None:
+    channel = repository.create_channel("alice", "https://www.youtube.com/@example/videos")
+    agent = make_agent(database, repository, tmp_path)
+    flaky = FlakyYouTube()
+    agent.youtube = SimpleNamespace(
+        discover=lambda url, kind, start, count, language: {
+            **flaky.discover(url, kind, start, count, language),
+            "entries": [{"id": "video_01", "timestamp": 1001, "rank": 1}],
+            "next_offset": 1,
+        },
+        inspect_batch=flaky.inspect_batch,
+    )
+
+    agent._initialize_channel("alice", int(channel["id"]))
+
+    initialized = repository.channel("alice", channel["id"])
+    assert (initialized["external_id"], initialized["title"], initialized["sync_status"]) == (
+        "UCchannel123",
+        "Example channel",
+        "idle",
+    )
+    assert repository.videos("alice", channel_id=channel["id"])["total"] == 0
+    assert hidden_rows(database) == [("video_01", 1, False)]
+

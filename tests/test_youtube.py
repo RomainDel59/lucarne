@@ -6,13 +6,15 @@ from types import SimpleNamespace
 import pytest
 
 from src.assets import ALLOWED_IMAGE_HOSTS
-from src.errors import LucarneError, VideoUnavailableError
+from src.errors import LucarneError, VideoUnavailableError, YtDlpError
 from src.youtube import (
     YouTubeClient,
+    classify_failure,
     normalize_channel_url,
     normalize_playlist_url,
     normalize_video_url,
     quality_format,
+    release_delay,
 )
 
 
@@ -156,3 +158,125 @@ def test_a_failure_that_succeeds_the_second_time_stays_an_error(monkeypatch: pyt
         YouTubeClient().run(["--dump-single-json", URL], language="fr")
 
     assert not isinstance(caught.value, VideoUnavailableError)
+
+
+@pytest.mark.parametrize(
+    ("message", "seconds"),
+    [
+        ("ERROR: [youtube] abc: Premieres in 110 minutes", 6600),
+        ("ERROR: [youtube] abc: Premieres in 2 hours", 7200),
+        ("ERROR: [youtube] abc: This live event will begin in 3 days.", 3 * 86400),
+        ("ERROR: [youtube] abc: Premieres in an hour", 3600),
+        ("ERROR: [youtube] abc: Premieres in about 5 minutes", 300),
+        ("ERROR: [youtube] abc: Premieres on a date nobody can parse", None),
+        ("ERROR: [youtube] abc: Private video", None),
+    ],
+)
+def test_the_start_of_a_premiere_is_read_in_the_message(message: str, seconds: int | None) -> None:
+    assert release_delay(message) == seconds
+
+
+def test_a_failure_is_described_by_its_cause() -> None:
+    private = classify_failure("abc", VideoUnavailableError("Privée", "Private video"))
+    premiere = classify_failure("abc", VideoUnavailableError("Première", "Premieres in 2 hours"))
+    unknown = classify_failure("abc", YtDlpError("Erreur", "Something odd"))
+
+    assert (private["known"], private["temporary"], private["retry_after"], private["reason"]) == (
+        True,
+        False,
+        None,
+        "Private video",
+    )
+    assert (premiere["known"], premiere["temporary"], premiere["retry_after"]) == (True, True, 7200)
+    assert (unknown["known"], unknown["temporary"], unknown["reason"]) == (False, False, "Something odd")
+
+
+def test_a_video_that_cannot_be_read_never_stops_the_others_of_the_batch(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_inspect(self: YouTubeClient, value: str, language: str = "en") -> dict:
+        identifier = value.rsplit("=", 1)[1]
+        if identifier == "video_bad1":
+            raise VideoUnavailableError("Privée", "Private video")
+        if identifier == "video_bad2":
+            raise YtDlpError("Erreur", "Something odd")
+        return {"id": identifier}
+
+    monkeypatch.setattr(YouTubeClient, "inspect_video", fake_inspect)
+    monkeypatch.setattr("src.youtube.time.sleep", lambda _: None)
+
+    entries, failures = YouTubeClient().inspect_batch(["video_ok_1", "video_bad1", "video_bad2", "video_ok_2"])
+
+    assert [item["id"] for item in entries] == ["video_ok_1", "video_ok_2"]
+    assert [(item["id"], item["known"]) for item in failures] == [("video_bad1", True), ("video_bad2", False)]
+
+
+def scripted_yt_dlp(monkeypatch: pytest.MonkeyPatch, plain: str, flagged: SimpleNamespace | None) -> list[bool]:
+    """Fail with `plain` when yt-dlp is not told to ignore missing formats, else answer with `flagged`."""
+    asked: list[bool] = []
+
+    def fake_run(command: list[str], **_: object) -> SimpleNamespace:
+        ignoring = "--ignore-no-formats-error" in command
+        asked.append(ignoring)
+        if ignoring:
+            assert flagged is not None
+            return flagged
+        return SimpleNamespace(returncode=1, stdout="", stderr=plain)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    return asked
+
+
+def upcoming(stamp: int | None, status: str = "is_upcoming") -> SimpleNamespace:
+    return SimpleNamespace(
+        returncode=0, stdout=f'{{"id": "abc", "live_status": "{status}", "release_timestamp": {stamp or "null"}}}', stderr=""
+    )
+
+
+def test_the_exact_start_of_a_premiere_is_asked_to_youtube(monkeypatch: pytest.MonkeyPatch) -> None:
+    asked = scripted_yt_dlp(monkeypatch, "ERROR: [youtube] abc: Premieres in 9 hours", upcoming(2_000_000_000))
+    monkeypatch.setattr("src.youtube.time.time", lambda: 2_000_000_000 - 32_400 - 3_600 + 60)
+
+    with pytest.raises(VideoUnavailableError) as caught:
+        YouTubeClient().inspect_video(URL)
+
+    assert asked == [False, True]
+    failure = classify_failure("abc", caught.value)
+    assert (failure["temporary"], failure["retry_after"]) == (True, 32_400 + 3_600 - 60)
+
+
+def test_the_delay_of_the_message_is_used_when_youtube_gives_no_start(monkeypatch: pytest.MonkeyPatch) -> None:
+    scripted_yt_dlp(monkeypatch, "ERROR: [youtube] abc: Premieres in 9 hours", upcoming(None))
+
+    with pytest.raises(VideoUnavailableError) as caught:
+        YouTubeClient().inspect_video(URL)
+
+    assert getattr(caught.value, "release_timestamp", "missing") is None
+    assert classify_failure("abc", caught.value)["retry_after"] == 9 * 3600
+
+
+def test_a_start_too_close_is_not_looked_at_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    scripted_yt_dlp(monkeypatch, "ERROR: [youtube] abc: Premieres in 1 minute", upcoming(2_000_000_010))
+    monkeypatch.setattr("src.youtube.time.time", lambda: 2_000_000_000)
+
+    with pytest.raises(VideoUnavailableError) as caught:
+        YouTubeClient().inspect_video(URL)
+
+    assert classify_failure("abc", caught.value)["retry_after"] == 300
+
+
+def test_the_start_is_only_asked_for_a_premiere(monkeypatch: pytest.MonkeyPatch) -> None:
+    asked = scripted_yt_dlp(monkeypatch, "ERROR: [youtube] abc: Private video", None)
+
+    with pytest.raises(VideoUnavailableError):
+        YouTubeClient().inspect_video(URL)
+
+    assert asked == [False]
+
+
+def test_a_video_that_is_not_upcoming_gives_no_start(monkeypatch: pytest.MonkeyPatch) -> None:
+    scripted_yt_dlp(monkeypatch, "ERROR: [youtube] abc: Premieres in 9 hours", upcoming(2_000_000_000, "not_live"))
+
+    with pytest.raises(VideoUnavailableError) as caught:
+        YouTubeClient().inspect_video(URL)
+
+    assert getattr(caught.value, "release_timestamp", "missing") is None
+

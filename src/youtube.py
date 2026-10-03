@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
-from .errors import LucarneError, VideoUnavailableError
+from .errors import LucarneError, VideoUnavailableError, YtDlpError
 
 VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{6,32}$")
 PLAYLIST_ID = re.compile(r"^[A-Za-z0-9_-]{10,128}$")
@@ -34,6 +34,54 @@ UNAVAILABLE_MARKERS = (
     "premiere will begin",
     "this live event will begin",
 )
+# Among them, those that go away by themselves: the video is announced and will be readable later.
+TEMPORARY_MARKERS = ("premieres in", "premiere will begin", "this live event will begin")
+RELEASE_DELAY = re.compile(r"\bin (?:about |approximately )?(\d+|an?|one) (minute|hour|day|week|month)s?\b")
+# An announced start closer than this is looked at no sooner: the video is not readable at the very second.
+MINIMUM_RELEASE_DELAY = 300
+UNIT_SECONDS = {"minute": 60, "hour": 3600, "day": 86400, "week": 7 * 86400, "month": 30 * 86400}
+
+
+def release_delay(reason: str) -> int | None:
+    """Seconds before a premiere or a live event starts, when the message says it ("Premieres in 2 hours")."""
+    match = RELEASE_DELAY.search(reason.lower())
+    if not match:
+        return None
+    amount = int(match.group(1)) if match.group(1).isdigit() else 1
+    return amount * UNIT_SECONDS[match.group(2)]
+
+
+def is_temporary(reason: str) -> bool:
+    return any(marker in reason.lower() for marker in TEMPORARY_MARKERS)
+
+
+def classify_failure(video_id: str, error: LucarneError) -> dict[str, Any]:
+    """Describe why a video could not be read: known or not, temporary or not, and when to try again.
+
+    The start of a premiere is the exact time given by YouTube when it was asked for, else the delay read in the
+    message, else nothing: the video is then looked at every hour.
+    """
+    reason = str(getattr(error, "reason", None) or error)
+    known = isinstance(error, VideoUnavailableError)
+    temporary = known and is_temporary(reason)
+    retry_after = None
+    if temporary:
+        stamp = getattr(error, "release_timestamp", None)
+        retry_after = (
+            max(int(stamp) - int(time.time()), MINIMUM_RELEASE_DELAY) if stamp else release_delay(reason)
+        )
+    return {
+        "id": video_id,
+        "reason": reason[-2000:],
+        "known": known,
+        "temporary": temporary,
+        "retry_after": retry_after,
+    }
+
+
+def video_id_from_url(value: str) -> str:
+    """The identifier of a normalized video address."""
+    return parse_qs(urlsplit(value).query).get("v", [""])[0]
 
 
 def quality_format(quality: str, audio_quality: str) -> str:
@@ -101,8 +149,8 @@ class YouTubeClient:
         # One rule for every failure: its reason is read in English to tell a video to skip from a real error.
         reason = detail if language in (None, "en") else self._english_detail(arguments, timeout)
         if any(marker in reason.lower() for marker in UNAVAILABLE_MARKERS):
-            raise VideoUnavailableError(detail)
-        raise LucarneError(detail)
+            raise VideoUnavailableError(detail, reason)
+        raise YtDlpError(detail, reason or detail)
 
     def _invoke(self, arguments: list[str], timeout: int, language: str | None) -> subprocess.CompletedProcess[str]:
         environment = os.environ.copy()
@@ -148,7 +196,12 @@ class YouTubeClient:
 
     def inspect_video(self, value: str, language: str = "en") -> dict[str, Any]:
         url = normalize_video_url(value)
-        output = self.run(["--no-warnings", "--no-playlist", "--dump-single-json", url], 180, language)
+        try:
+            output = self.run(["--no-warnings", "--no-playlist", "--dump-single-json", url], 180, language)
+        except VideoUnavailableError as error:
+            if is_temporary(error.reason):
+                error.release_timestamp = self._release_timestamp(url)
+            raise
         try:
             data = json.loads(output)
         except json.JSONDecodeError as error:
@@ -156,6 +209,19 @@ class YouTubeClient:
         if not isinstance(data, dict) or not data.get("id"):
             raise LucarneError("The video does not expose usable metadata.")
         return data
+
+    def _release_timestamp(self, url: str) -> int | None:
+        """The exact start of a premiere or a live event: asked without failing on the missing formats, YouTube
+        gives it in the metadata. Without it, the delay of the message is used."""
+        try:
+            output = self.run(
+                ["--no-warnings", "--no-playlist", "--ignore-no-formats-error", "--dump-single-json", url], 180, "en"
+            )
+            data = json.loads(output)
+        except (LucarneError, json.JSONDecodeError):
+            return None
+        stamp = data.get("release_timestamp") if isinstance(data, dict) else None
+        return int(stamp) if data.get("live_status") == "is_upcoming" and isinstance(stamp, int | float) else None
 
     def discover(
         self, value: str, source_type: str, start: int, count: int, language: str = "en"
@@ -204,21 +270,23 @@ class YouTubeClient:
 
     def inspect_batch(
         self, video_ids: list[str], language: str = "en"
-    ) -> tuple[list[dict[str, Any]], list[str]]:
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Read the metadata of videos. A video that cannot be read never stops the others: it is described in
+        the failures (see `classify_failure`) and the batch goes on."""
         if len(video_ids) > 50:
             raise LucarneError("A batch cannot contain more than 50 videos.")
         entries: list[dict[str, Any]] = []
-        unavailable: list[str] = []
+        failures: list[dict[str, Any]] = []
         for index, video_id in enumerate(video_ids):
             if not VIDEO_ID.fullmatch(video_id):
                 continue
             try:
                 entries.append(self.inspect_video(f"https://www.youtube.com/watch?v={video_id}", language))
-            except VideoUnavailableError:
-                unavailable.append(video_id)
+            except LucarneError as error:
+                failures.append(classify_failure(video_id, error))
             if index + 1 < len(video_ids):
                 time.sleep(random.uniform(2, 6))
-        return entries, unavailable
+        return entries, failures
 
     def download(
         self,

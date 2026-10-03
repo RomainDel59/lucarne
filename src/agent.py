@@ -15,7 +15,7 @@ from .database import Database
 from .errors import LucarneError, VideoUnavailableError
 from .media import MediaService
 from .repository import Repository, now
-from .youtube import YouTubeClient
+from .youtube import YouTubeClient, classify_failure, video_id_from_url
 
 LOGGER = logging.getLogger("lucarne.agent")
 
@@ -81,6 +81,7 @@ class Agent:
             campaign = self.repository.ensure_campaign(user_id)
             self._cancel_obsolete_history_jobs(user_id)
             self._prepare_automatic_jobs(user_id, campaign)
+            self._plan_retries(user_id)
             if int(campaign["next_lot_at"]) > now():
                 continue
             job = self.db.one(
@@ -244,6 +245,8 @@ class Agent:
             )
         elif job_type == "inspect_video":
             self._inspect_single_video(user_id, str(payload["url"]), payload.get("playlist_id"))
+        elif job_type == "retry_videos":
+            self._retry_videos(user_id, [str(value) for value in payload.get("youtube_ids", [])])
         elif job_type == "delete_channel":
             self._delete_channel(user_id, int(target_id or 0), bool(payload.get("delete_videos")))
         elif job_type == "delete_playlist":
@@ -273,7 +276,7 @@ class Agent:
         entries = data["entries"]
         if not entries:
             raise LucarneError("This channel does not contain any usable videos.")
-        details, unavailable = self.youtube.inspect_batch([entries[0]["id"]], language)
+        details, failures = self.youtube.inspect_batch([entries[0]["id"]], language)
         metadata = details[0] if details else {}
         external_id = data.get("id") or metadata.get("channel_id") or metadata.get("uploader_id")
         if not external_id:
@@ -287,7 +290,7 @@ class Agent:
         self._update_source(user_id, "channel", channel_id, data)
         for item in details:
             self._store_metadata(user_id, item, channel_id=channel_id)
-        self._mark_unavailable(user_id, unavailable)
+        self._record_failures(user_id, failures, channel_id=channel_id)
 
     def _initialize_playlist(self, user_id: str, playlist_id: int) -> None:
         playlist = self.repository.playlist(user_id, playlist_id)
@@ -298,16 +301,57 @@ class Agent:
             raise LucarneError("This playlist does not contain any usable videos.")
         self._update_source(user_id, "playlist", playlist_id, data)
         if entries:
-            details, unavailable = self.youtube.inspect_batch([entries[0]["id"]], language)
+            details, failures = self.youtube.inspect_batch([entries[0]["id"]], language)
             for metadata in details:
                 video = self._store_metadata(user_id, metadata)
                 self.repository.attach_video(user_id, playlist_id, int(video["id"]), entries[0].get("rank"))
-            self._mark_unavailable(user_id, unavailable)
+            self._record_failures(
+                user_id, failures, playlist_id=playlist_id, ranks={entries[0]["id"]: entries[0].get("rank")}
+            )
 
     def _inspect_single_video(self, user_id: str, url: str, playlist_id: int | None) -> None:
-        video = self._store_metadata(user_id, self.youtube.inspect_video(url, self.repository.metadata_language()))
+        try:
+            metadata = self.youtube.inspect_video(url, self.repository.metadata_language())
+        except VideoUnavailableError as error:
+            failure = classify_failure(video_id_from_url(url), error)
+            self._record_failures(user_id, [failure], playlist_id=int(playlist_id) if playlist_id else None)
+            return
+        video = self._store_metadata(user_id, metadata)
         if playlist_id:
             self.repository.attach_video(user_id, int(playlist_id), int(video["id"]))
+
+    def _plan_retries(self, user_id: str) -> None:
+        """Ask for a new try of the videos that could not be read and whose time has come, one batch at a time."""
+        active = self.db.one(
+            "SELECT COUNT(*) AS count FROM agent_jobs WHERE user_id=? AND type='retry_videos' AND status IN ('queued','running')",
+            (user_id,),
+        )
+        if int((active or {}).get("count", 0)):
+            return
+        due = self.repository.due_retries(user_id, int(self.repository.instance_settings()["batch_size"]))
+        if due:
+            self.repository.enqueue(
+                user_id,
+                "retry_videos",
+                None,
+                None,
+                {"youtube_ids": [str(row["youtube_id"]) for row in due]},
+                manual=False,
+            )
+
+    def _retry_videos(self, user_id: str, youtube_ids: list[str]) -> None:
+        rows = {}
+        for youtube_id in youtube_ids:
+            row = self.repository.video_by_youtube_id(user_id, youtube_id)
+            if row and row["availability"] == "skipped" and not row["deleting"]:
+                rows[youtube_id] = row
+        if not rows:
+            return
+        details, failures = self.youtube.inspect_batch(list(rows), self.repository.metadata_language())
+        for metadata in details:
+            self._store_metadata(user_id, metadata, channel_id=rows[str(metadata["id"])]["channel_id"])
+        for failure in failures:
+            self._record_failures(user_id, [failure], channel_id=rows[failure["id"]]["channel_id"])
 
     def _discover_source(self, user_id: str, source_type: str, source_id: int) -> None:
         source = (
@@ -346,13 +390,13 @@ class Agent:
     def _local_source_priority(self, user_id: str, source_type: str, source_id: int) -> int:
         if source_type == "channel":
             row = self.db.one(
-                "SELECT MAX(published_at) AS value FROM videos WHERE user_id=? AND channel_id=?",
+                "SELECT MAX(published_at) AS value FROM videos WHERE user_id=? AND channel_id=? AND availability!='skipped'",
                 (user_id, source_id),
             )
         else:
             row = self.db.one(
                 """SELECT MAX(v.published_at) AS value FROM playlist_videos pv JOIN videos v ON v.id=pv.video_id
-                   WHERE pv.playlist_id=? AND v.user_id=?""",
+                   WHERE pv.playlist_id=? AND v.user_id=? AND v.availability!='skipped'""",
                 (source_id, user_id),
             )
         return int((row or {}).get("value") or 0)
@@ -367,10 +411,11 @@ class Agent:
         )
         if not candidates:
             return
-        details, unavailable = self.youtube.inspect_batch(
+        details, failures = self.youtube.inspect_batch(
             [str(item["youtube_id"]) for item in candidates], self.repository.metadata_language()
         )
         by_id = {str(item["id"]): item for item in details}
+        by_candidate = {str(item["youtube_id"]): item for item in candidates}
         for candidate in candidates:
             metadata = by_id.get(str(candidate["youtube_id"]))
             if metadata:
@@ -380,11 +425,19 @@ class Agent:
                     self.repository.attach_video(
                         user_id, int(candidate["source_id"]), int(video["id"]), candidate["source_rank"]
                     )
-        self._mark_unavailable(user_id, unavailable)
+        for failure in failures:
+            candidate = by_candidate[failure["id"]]
+            is_channel = candidate["source_type"] == "channel"
+            self._record_failures(
+                user_id,
+                [failure],
+                channel_id=int(candidate["source_id"]) if is_channel else None,
+                playlist_id=None if is_channel else int(candidate["source_id"]),
+                ranks={failure["id"]: candidate["source_rank"]},
+            )
         with self.db.write() as connection:
             for item in candidates:
-                status = "done" if str(item["youtube_id"]) in by_id else "unavailable"
-                connection.execute("UPDATE candidates SET status=? WHERE id=?", (status, item["id"]))
+                connection.execute("UPDATE candidates SET status='done' WHERE id=?", (item["id"],))
 
     def _history_source(self, user_id: str) -> dict[str, Any] | None:
         sources: list[tuple[int, dict[str, Any]]] = []
@@ -396,7 +449,8 @@ class Agent:
             if channel["source_exhausted"] or (cap and channel["video_count"] >= cap):
                 continue
             frontier = self.db.one(
-                "SELECT MIN(published_at) AS value FROM videos WHERE user_id=? AND channel_id=? AND deleting=0",
+                """SELECT MIN(published_at) AS value FROM videos
+                   WHERE user_id=? AND channel_id=? AND deleting=0 AND availability!='skipped'""",
                 (user_id, channel["id"]),
             )
             sources.append((int((frontier or {}).get("value") or 2**62), {"type": "channel", **channel}))
@@ -408,7 +462,7 @@ class Agent:
                 continue
             frontier = self.db.one(
                 """SELECT MIN(v.published_at) AS value FROM playlist_videos pv JOIN videos v ON v.id=pv.video_id
-                   WHERE pv.playlist_id=? AND v.user_id=? AND v.deleting=0""",
+                   WHERE pv.playlist_id=? AND v.user_id=? AND v.deleting=0 AND v.availability!='skipped'""",
                 (playlist["id"], user_id),
             )
             sources.append((int((frontier or {}).get("value") or 2**62), {"type": "playlist", **playlist}))
@@ -426,10 +480,15 @@ class Agent:
         cap = source["history_limit"] if source["history_limit"] is not None else personal_limit
         if source_type == "channel":
             known = self.db.one(
-                "SELECT COUNT(*) AS count FROM videos WHERE user_id=? AND channel_id=?", (user_id, source_id)
+                "SELECT COUNT(*) AS count FROM videos WHERE user_id=? AND channel_id=? AND availability!='skipped'",
+                (user_id, source_id),
             )
         else:
-            known = self.db.one("SELECT COUNT(*) AS count FROM playlist_videos WHERE playlist_id=?", (source_id,))
+            known = self.db.one(
+                """SELECT COUNT(*) AS count FROM playlist_videos pv JOIN videos v ON v.id=pv.video_id
+                   WHERE pv.playlist_id=? AND v.availability!='skipped'""",
+                (source_id,),
+            )
         remaining = max(0, int(cap) - int((known or {}).get("count", 0))) if cap else limit
         limit = min(limit, remaining) if cap else limit
         if limit <= 0:
@@ -437,7 +496,7 @@ class Agent:
         start = int(source["catalog_offset"]) + 1
         language = self.repository.metadata_language()
         data = self.youtube.discover(str(source["source_url"]), source_type, start, limit, language)
-        details, unavailable = self.youtube.inspect_batch([str(item["id"]) for item in data["entries"]], language)
+        details, failures = self.youtube.inspect_batch([str(item["id"]) for item in data["entries"]], language)
         ranks = {str(item["id"]): item.get("rank") for item in data["entries"]}
         for metadata in details:
             video = self._store_metadata(user_id, metadata, int(source["id"]) if source_type == "channel" else None)
@@ -445,7 +504,13 @@ class Agent:
                 self.repository.attach_video(
                     user_id, int(source["id"]), int(video["id"]), ranks.get(str(video["youtube_id"]))
                 )
-        self._mark_unavailable(user_id, unavailable)
+        self._record_failures(
+            user_id,
+            failures,
+            channel_id=int(source["id"]) if source_type == "channel" else None,
+            playlist_id=int(source["id"]) if source_type == "playlist" else None,
+            ranks=ranks,
+        )
         self._update_source(user_id, source_type, int(source["id"]), data)
 
     def _store_metadata(self, user_id: str, metadata: dict[str, Any], channel_id: int | None = None) -> dict[str, Any]:
@@ -548,29 +613,31 @@ class Agent:
                 ),
             )
 
-    def _mark_unavailable(self, user_id: str, youtube_ids: list[str]) -> None:
-        if not youtube_ids:
+    def _record_failures(
+        self,
+        user_id: str,
+        failures: list[dict[str, Any]],
+        channel_id: int | None = None,
+        playlist_id: int | None = None,
+        ranks: dict[str, Any] | None = None,
+    ) -> None:
+        """Keep a trace of the videos that could not be read, with the reason, so that nothing is lost or blocked.
+
+        A video of a YouTube playlist keeps its place in it, like the others.
+        """
+        if not failures:
             return
-        LOGGER.info(
-            "Skipped %s unavailable YouTube video(s): %s",
-            len(youtube_ids),
-            ", ".join(sorted(set(youtube_ids))),
-        )
-        with self.db.write() as connection:
-            connection.executemany(
-                """UPDATE videos SET availability='unavailable',unavailable_reason=?,availability_checked_at=?,updated_at=?
-                   WHERE user_id=? AND youtube_id=?""",
-                [
-                    (
-                        "This video is private, deleted, or temporarily unavailable on YouTube.",
-                        now(),
-                        now(),
-                        user_id,
-                        value,
-                    )
-                    for value in youtube_ids
-                ],
+        channel_name = str(self.repository.channel(user_id, channel_id)["title"]) if channel_id else ""
+        for failure in failures:
+            LOGGER.info(
+                "Could not read video %s (%s cause): %s",
+                failure["id"],
+                "known" if failure["known"] else "unknown",
+                str(failure["reason"]).strip().splitlines()[-1][:300] if failure["reason"] else "",
             )
+            video = self.repository.record_unreadable_video(user_id, failure, channel_id, channel_name)
+            if video and playlist_id:
+                self.repository.attach_video(user_id, playlist_id, int(video["id"]), (ranks or {}).get(failure["id"]))
 
     def _delete_channel(self, user_id: str, channel_id: int, delete_videos: bool) -> None:
         self._cancel_target_jobs(user_id, "channel", channel_id)
@@ -714,11 +781,14 @@ class Agent:
                     continue
                 if source_type == "channel":
                     count = self.db.one(
-                        "SELECT COUNT(*) AS count FROM videos WHERE user_id=? AND channel_id=?", (user_id, source_id)
+                        "SELECT COUNT(*) AS count FROM videos WHERE user_id=? AND channel_id=? AND availability!='skipped'",
+                        (user_id, source_id),
                     )
                 else:
                     count = self.db.one(
-                        "SELECT COUNT(*) AS count FROM playlist_videos WHERE playlist_id=?", (source_id,)
+                        """SELECT COUNT(*) AS count FROM playlist_videos pv JOIN videos v ON v.id=pv.video_id
+                           WHERE pv.playlist_id=? AND v.availability!='skipped'""",
+                        (source_id,),
                     )
                 if int((count or {}).get("count", 0)) < int(limit):
                     continue

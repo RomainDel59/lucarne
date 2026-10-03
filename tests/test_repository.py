@@ -319,6 +319,8 @@ def test_a_database_without_the_metadata_language_is_upgraded(tmp_path: Path) ->
         connection.execute("INSERT INTO instance_settings(singleton, updated_at) VALUES (1, 1)")
         connection.execute("ALTER TABLE instance_settings DROP COLUMN metadata_language")
         connection.execute("ALTER TABLE candidates DROP COLUMN source_rank")
+        connection.execute("ALTER TABLE videos DROP COLUMN skip_attempts")
+        connection.execute("ALTER TABLE videos DROP COLUMN retry_at")
         connection.execute("UPDATE schema_meta SET version=2")
 
     database.initialize()
@@ -379,3 +381,89 @@ def test_a_youtube_playlist_follows_the_rank_given_by_youtube(repository: Reposi
 
     repository.attach_video("alice", playlist["id"], videos[3]["id"], 1)
     assert playlist_order(repository, playlist["id"])[0] in {"video_01", "video_03"}
+
+
+def unreadable(identifier: str, **values: object) -> dict:
+    return {"id": identifier, "reason": "Private video", "known": True, "temporary": False, "retry_after": None, **values}
+
+
+def test_a_video_that_cannot_be_read_is_kept_but_hidden_with_its_reason(repository: Repository) -> None:
+    channel = repository.create_channel("alice", "https://www.youtube.com/@alice/videos")
+    playlist = repository.create_playlist("alice", "Mix", "https://www.youtube.com/playlist?list=PLabcdefghijk")
+    readable = repository.store_video("alice", {"id": "video_ok_1", "title": "Readable", "timestamp": 1000}, channel["id"])
+    repository.attach_video("alice", playlist["id"], readable["id"], 1)
+
+    skipped = repository.record_unreadable_video("alice", unreadable("video_bad1"), channel["id"], "Alice")
+    repository.attach_video("alice", playlist["id"], skipped["id"], 2)
+
+    assert (skipped["availability"], skipped["unavailable_reason"], skipped["retry_at"]) == ("skipped", "Private video", None)
+    assert skipped["title"] == "video_bad1" and skipped["channel_name"] == "Alice"
+    assert [item["youtube_id"] for item in repository.videos("alice")["items"]] == ["video_ok_1"]
+    assert [item["youtube_id"] for item in repository.videos("alice", playlist_id=playlist["id"])["items"]] == [
+        "video_ok_1"
+    ]
+    assert repository.channel("alice", channel["id"]) and repository.channels("alice")[0]["video_count"] == 1
+    assert repository.playlists("alice")[0]["video_count"] == 1
+    assert repository.video("alice", skipped["id"])["youtube_id"] == "video_bad1"
+
+
+def test_a_failure_with_an_unknown_cause_says_nothing_about_a_readable_video(repository: Repository) -> None:
+    video = repository.store_video("alice", {"id": "video_ok_1", "title": "Readable", "timestamp": 1000})
+
+    assert repository.record_unreadable_video("alice", unreadable("video_ok_1", known=False)) is None
+    assert repository.video("alice", video["id"])["availability"] == "available"
+
+    repository.record_unreadable_video("alice", unreadable("video_ok_1", reason="Video unavailable"))
+    changed = repository.video("alice", video["id"])
+    assert (changed["availability"], changed["unavailable_reason"]) == ("unavailable", "Video unavailable")
+    assert [item["youtube_id"] for item in repository.videos("alice")["items"]] == ["video_ok_1"]
+
+
+def test_a_video_that_cannot_be_read_is_tried_again_until_it_is_given_up(repository: Repository) -> None:
+    unknown = unreadable("video_bad1", known=False, reason="Something odd")
+
+    first = repository.record_unreadable_video("alice", unknown)
+    assert (first["skip_attempts"], first["retry_at"] is not None) == (1, True)
+    assert repository.due_retries("alice", 10) == []
+
+    with repository.db.write() as connection:
+        connection.execute("UPDATE videos SET retry_at=1 WHERE id=?", (first["id"],))
+    assert [item["youtube_id"] for item in repository.due_retries("alice", 10)] == ["video_bad1"]
+
+    second = repository.record_unreadable_video("alice", unknown)
+    assert second["id"] == first["id"] and second["skip_attempts"] == 2 and second["retry_at"] is not None
+    third = repository.record_unreadable_video("alice", unknown)
+    assert (third["skip_attempts"], third["retry_at"]) == (3, None)
+    assert repository.due_retries("alice", 10) == []
+
+
+def test_a_video_that_is_read_again_becomes_whole_again(repository: Repository) -> None:
+    skipped = repository.record_unreadable_video("alice", unreadable("video_bad1", known=False, reason="Something odd"))
+
+    video = repository.store_video("alice", {"id": "video_bad1", "title": "Back", "timestamp": 1000})
+
+    assert video["id"] == skipped["id"]
+    assert (video["availability"], video["unavailable_reason"], video["skip_attempts"], video["retry_at"]) == (
+        "available",
+        None,
+        0,
+        None,
+    )
+    assert [item["youtube_id"] for item in repository.videos("alice")["items"]] == ["video_bad1"]
+
+
+def test_a_video_waiting_to_be_deleted_is_not_recorded_again(repository: Repository) -> None:
+    video = repository.store_video("alice", {"id": "video_ok_1", "title": "Readable", "timestamp": 1000})
+    repository.mark_video_deleting("alice", video["id"])
+
+    assert repository.record_unreadable_video("alice", unreadable("video_ok_1")) is None
+
+
+def test_videos_are_placed_by_their_publication_date_or_else_by_the_date_they_were_added(
+    repository: Repository,
+) -> None:
+    repository.store_video("alice", {"id": "video_old1", "title": "Old", "timestamp": 1000})
+    repository.store_video("alice", {"id": "video_nodate", "title": "No date"})
+
+    assert [item["youtube_id"] for item in repository.videos("alice")["items"]] == ["video_nodate", "video_old1"]
+
