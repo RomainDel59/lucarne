@@ -19,6 +19,8 @@ PLAYLIST_ID = re.compile(r"^[A-Za-z0-9_-]{10,128}$")
 CHANNEL_PATH = re.compile(r"^/(?:@[^/]+|channel/[A-Za-z0-9_-]+|c/[^/]+|user/[^/]+)(?:/videos)?$")
 ALLOWED_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com"}
 METADATA_LANGUAGE = re.compile(r"[a-z]{2,3}(?:-[A-Z]{2})?")
+# Messages of yt-dlp that mean a video cannot be read, so it is skipped as if it did not exist. They are only
+# looked for in English: the reason of a failure is always read in English, whatever the metadata language.
 UNAVAILABLE_MARKERS = (
     "video unavailable",
     "private video",
@@ -26,23 +28,11 @@ UNAVAILABLE_MARKERS = (
     "has been removed",
     "members-only content",
     "join this channel",
-    "join this channel to get access",
-    "cette vidéo n'est pas disponible",
-    "cette vidéo n’est pas disponible",
-    "vidéo privée",
-    "cette vidéo est privée",
-    "a été supprimée",
-    "réservé aux membres",
-    "réservés aux membres",
-    "contenu réservé aux membres",
-    "contenus réservés aux membres",
+    "confirm your age",
     # Premieres and live events that have not started: the video cannot be read yet.
     "premieres in",
     "premiere will begin",
     "this live event will begin",
-    "première dans",
-    "la première commencera",
-    "cet événement en direct commencera",
 )
 
 
@@ -104,10 +94,21 @@ class YouTubeClient:
         self.executable = executable
 
     def run(self, arguments: list[str], timeout: int = 300, language: str | None = None) -> str:
+        result = self._invoke(arguments, timeout, language)
+        if not result.returncode:
+            return result.stdout
+        detail = self._detail(result)
+        # One rule for every failure: its reason is read in English to tell a video to skip from a real error.
+        reason = detail if language in (None, "en") else self._english_detail(arguments, timeout)
+        if any(marker in reason.lower() for marker in UNAVAILABLE_MARKERS):
+            raise VideoUnavailableError(detail)
+        raise LucarneError(detail)
+
+    def _invoke(self, arguments: list[str], timeout: int, language: str | None) -> subprocess.CompletedProcess[str]:
         environment = os.environ.copy()
         environment.setdefault("LANG", "C.UTF-8")
         try:
-            result = subprocess.run(
+            return subprocess.run(
                 [
                     self.executable,
                     "--ignore-config",
@@ -125,12 +126,18 @@ class YouTubeClient:
             )
         except subprocess.TimeoutExpired as error:
             raise LucarneError("yt-dlp exceeded the allowed time.") from error
-        if result.returncode:
-            detail = (result.stderr or result.stdout or "Unknown yt-dlp error").strip()[-4000:]
-            if any(marker in detail.lower() for marker in UNAVAILABLE_MARKERS):
-                raise VideoUnavailableError(detail)
-            raise LucarneError(detail)
-        return result.stdout
+
+    @staticmethod
+    def _detail(result: subprocess.CompletedProcess[str]) -> str:
+        return (result.stderr or result.stdout or "Unknown yt-dlp error").strip()[-4000:]
+
+    def _english_detail(self, arguments: list[str], timeout: int) -> str:
+        """Ask again in English why the request failed; an empty text means the reason could not be read."""
+        try:
+            result = self._invoke(arguments, timeout, "en")
+        except LucarneError:
+            return ""
+        return self._detail(result) if result.returncode else ""
 
     @staticmethod
     def _language_arguments(language: str | None) -> list[str]:

@@ -90,31 +90,69 @@ def test_an_unexpected_language_is_never_passed_to_yt_dlp(monkeypatch: pytest.Mo
     assert "--extractor-args" not in captured_command(monkeypatch, language=value)
 
 
+URL = "https://www.youtube.com/watch?v=ko_T10wLv-E"
+
+
+def failing_yt_dlp(monkeypatch: pytest.MonkeyPatch, messages: dict[str, str]) -> list[str | None]:
+    """Make yt-dlp fail with the message of the requested language; return the languages that were requested."""
+    requested: list[str | None] = []
+
+    def fake_run(command: list[str], **_: object) -> SimpleNamespace:
+        language = command[command.index("--extractor-args") + 1].split("=")[1] if "--extractor-args" in command else None
+        requested.append(language)
+        return SimpleNamespace(returncode=1, stdout="", stderr=messages[language or "en"])
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    return requested
+
+
 @pytest.mark.parametrize(
-    "message",
+    "english",
     [
-        "ERROR: [youtube] ko_T10wLv-E: Première dans 110 minutes",
         "ERROR: [youtube] ko_T10wLv-E: Premieres in 2 hours",
         "ERROR: [youtube] ko_T10wLv-E: This live event will begin in 3 hours.",
         "ERROR: [youtube] ko_T10wLv-E: Private video. Sign in if you've been granted access to this video",
+        "ERROR: [youtube] ko_T10wLv-E: Sign in to confirm your age. Use --cookies-from-browser or --cookies",
     ],
 )
-def test_a_video_that_cannot_be_read_yet_is_skipped_like_a_private_one(
-    monkeypatch: pytest.MonkeyPatch, message: str
+def test_the_reason_of_a_failure_is_read_in_english_to_skip_a_video(
+    monkeypatch: pytest.MonkeyPatch, english: str
 ) -> None:
-    monkeypatch.setattr(
-        subprocess, "run", lambda *_, **__: SimpleNamespace(returncode=1, stdout="", stderr=message)
-    )
+    requested = failing_yt_dlp(monkeypatch, {"fr": "ERROR: [youtube] ko_T10wLv-E: Connexion requise", "en": english})
+
+    with pytest.raises(VideoUnavailableError) as caught:
+        YouTubeClient().run(["--dump-single-json", URL], language="fr")
+
+    assert requested == ["fr", "en"]
+    assert "Connexion requise" in str(caught.value)
+
+
+@pytest.mark.parametrize("language", [None, "en"])
+def test_an_english_failure_is_not_asked_twice(monkeypatch: pytest.MonkeyPatch, language: str | None) -> None:
+    requested = failing_yt_dlp(monkeypatch, {"en": "ERROR: [youtube] ko_T10wLv-E: Premieres in 2 hours"})
 
     with pytest.raises(VideoUnavailableError):
-        YouTubeClient().run(["--dump-single-json", "https://www.youtube.com/watch?v=ko_T10wLv-E"])
+        YouTubeClient().run(["--dump-single-json", URL], language=language)
+
+    assert len(requested) == 1
 
 
-def test_a_real_failure_is_still_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        subprocess, "run", lambda *_, **__: SimpleNamespace(returncode=1, stdout="", stderr="HTTP Error 429")
-    )
+def test_a_real_failure_is_still_an_error_whatever_the_language(monkeypatch: pytest.MonkeyPatch) -> None:
+    requested = failing_yt_dlp(monkeypatch, {"fr": "ERREUR : trop de requêtes (429)", "en": "HTTP Error 429"})
 
     with pytest.raises(LucarneError) as caught:
-        YouTubeClient().run(["--dump-single-json", "https://www.youtube.com/watch?v=ko_T10wLv-E"])
+        YouTubeClient().run(["--dump-single-json", URL], language="fr")
+
+    assert not isinstance(caught.value, VideoUnavailableError)
+    assert str(caught.value) == "ERREUR : trop de requêtes (429)"
+    assert requested == ["fr", "en"]
+
+
+def test_a_failure_that_succeeds_the_second_time_stays_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = iter([SimpleNamespace(returncode=1, stdout="", stderr="Connexion requise"), SimpleNamespace(returncode=0, stdout="{}", stderr="")])
+    monkeypatch.setattr(subprocess, "run", lambda *_, **__: next(calls))
+
+    with pytest.raises(LucarneError) as caught:
+        YouTubeClient().run(["--dump-single-json", URL], language="fr")
+
     assert not isinstance(caught.value, VideoUnavailableError)
