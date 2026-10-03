@@ -70,3 +70,4 @@ class InstanceSettingsRequest(BaseModel):
     campaign_duration_seconds: int
     temporary_retention_days: int = Field(ge=1, le=365)
     metadata_language: str | None = None
+    show_skipped_videos: bool | None = None

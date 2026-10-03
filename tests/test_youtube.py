@@ -280,3 +280,11 @@ def test_a_video_that_is_not_upcoming_gives_no_start(monkeypatch: pytest.MonkeyP
 
     assert getattr(caught.value, "release_timestamp", "missing") is None
 
+
+def test_the_reason_kept_is_the_message_of_youtube_without_the_yt_dlp_prefix() -> None:
+    private = classify_failure("abc", VideoUnavailableError("x", "ERROR: [youtube] abc: Private video"))
+    plain = classify_failure("abc", YtDlpError("x", "Something odd"))
+
+    assert private["reason"] == "Private video"
+    assert plain["reason"] == "Something odd"
+

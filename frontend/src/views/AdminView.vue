@@ -16,6 +16,14 @@
 					v-model="form.metadata_language"
 					:options="languageOptions"
 					:label="t('Language of YouTube titles and descriptions')" />
+				<div class="lucarne-wide">
+					<NcCheckboxRadioSwitch v-model="form.show_skipped_videos" type="switch">
+						{{ t('Show the videos that could not be read') }}
+					</NcCheckboxRadioSwitch>
+					<p class="lucarne-hint">
+						{{ t('These videos are private, age-restricted, announced for later, or failed for another reason. They stay hidden unless you show them; their page gives the reason and a button to try again.') }}
+					</p>
+				</div>
 				<NcTextField
 					v-model="form.batch_size"
 					type="number"
@@ -40,6 +48,7 @@
 </template>
 
 <script setup>
+import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
@@ -56,6 +65,7 @@ import { notify, notifyError } from '../notify.js'
 
 const form = reactive({
 	metadata_language: 'en',
+	show_skipped_videos: false,
 	batch_size: '10',
 	lot_wait_seconds: '300',
 	campaign_duration_seconds: '7200',
@@ -90,7 +100,7 @@ const { data, loading, error } = useAsync(() => request('api/admin/settings'), (
 function reset() {
 	if (data.value) {
 		for (const key of Object.keys(form)) {
-			form[key] = String(data.value[key])
+			form[key] = key === 'show_skipped_videos' ? Boolean(data.value[key]) : String(data.value[key])
 		}
 	}
 }
@@ -102,7 +112,7 @@ const dirty = computed(() => Boolean(data.value) && Object.keys(form).some((key)
 async function save() {
 	try {
 		const values = Object.fromEntries(
-			Object.entries(form).map(([key, value]) => [key, key === 'metadata_language' ? value : Number(value)]),
+			Object.entries(form).map(([key, value]) => [key, ['metadata_language', 'show_skipped_videos'].includes(key) ? value : Number(value)]),
 		)
 		await send('PUT', 'api/admin/settings', values)
 		data.value = { ...data.value, ...values }
@@ -112,3 +122,15 @@ async function save() {
 	}
 }
 </script>
+
+<style scoped>
+/* The switch and its explanation take a whole row of the form. */
+.lucarne-wide {
+	grid-column: 1 / -1;
+}
+
+.lucarne-hint {
+	margin: 0;
+	color: var(--color-text-maxcontrast);
+}
+</style>

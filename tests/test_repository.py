@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from src.database import SCHEMA_VERSION, Database
-from src.errors import NotFoundError
+from src.errors import ConflictError, NotFoundError
 from src.repository import Repository
 
 
@@ -321,6 +321,7 @@ def test_a_database_without_the_metadata_language_is_upgraded(tmp_path: Path) ->
         connection.execute("ALTER TABLE candidates DROP COLUMN source_rank")
         connection.execute("ALTER TABLE videos DROP COLUMN skip_attempts")
         connection.execute("ALTER TABLE videos DROP COLUMN retry_at")
+        connection.execute("ALTER TABLE instance_settings DROP COLUMN show_skipped_videos")
         connection.execute("UPDATE schema_meta SET version=2")
 
     database.initialize()
@@ -466,4 +467,42 @@ def test_videos_are_placed_by_their_publication_date_or_else_by_the_date_they_we
     repository.store_video("alice", {"id": "video_nodate", "title": "No date"})
 
     assert [item["youtube_id"] for item in repository.videos("alice")["items"]] == ["video_nodate", "video_old1"]
+
+
+def test_the_videos_that_could_not_be_read_stay_hidden_until_an_administrator_shows_them(
+    repository: Repository,
+) -> None:
+    repository.store_video("alice", {"id": "video_ok_1", "title": "Readable", "timestamp": 1000})
+    repository.record_unreadable_video("alice", unreadable("video_bad1"))
+
+    assert repository.show_skipped_videos() is False
+    assert [item["youtube_id"] for item in repository.videos("alice")["items"]] == ["video_ok_1"]
+
+    repository.update_instance_settings({"show_skipped_videos": True})
+    shown = repository.videos("alice")
+    assert repository.show_skipped_videos() is True
+    assert shown["total"] == 2
+    assert {item["youtube_id"]: item["availability"] for item in shown["items"]} == {
+        "video_ok_1": "available",
+        "video_bad1": "skipped",
+    }
+
+    repository.update_instance_settings({"batch_size": 20})
+    assert repository.show_skipped_videos() is True
+    repository.update_instance_settings({"show_skipped_videos": False})
+    assert repository.videos("alice")["total"] == 1
+
+
+def test_a_video_that_could_not_be_read_is_tried_again_on_request(repository: Repository) -> None:
+    video = repository.record_unreadable_video("alice", unreadable("video_bad1", known=False, reason="Something odd"))
+    readable = repository.store_video("alice", {"id": "video_ok_1", "title": "Readable", "timestamp": 1000})
+
+    job = repository.request_video_retry("alice", video["id"])
+
+    assert job["type"] == "retry_videos" and job["payload"] == {"youtube_ids": ["video_bad1"]}
+    waiting = repository.video("alice", video["id"])
+    assert (waiting["skip_attempts"], waiting["retry_at"]) == (0, None)
+    assert repository.request_video_retry("alice", video["id"])["id"] == job["id"]
+    with pytest.raises(ConflictError):
+        repository.request_video_retry("alice", readable["id"])
 

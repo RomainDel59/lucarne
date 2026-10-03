@@ -51,6 +51,9 @@ def release_delay(reason: str) -> int | None:
     return amount * UNIT_SECONDS[match.group(2)]
 
 
+YT_DLP_PREFIX = re.compile(r"^ERROR:\s*(?:\[[^\]]+\]\s*[A-Za-z0-9_-]+:\s*)?")
+
+
 def is_temporary(reason: str) -> bool:
     return any(marker in reason.lower() for marker in TEMPORARY_MARKERS)
 
@@ -72,7 +75,8 @@ def classify_failure(video_id: str, error: LucarneError) -> dict[str, Any]:
         )
     return {
         "id": video_id,
-        "reason": reason[-2000:],
+        # The text kept for the user is the message of YouTube, without the prefix yt-dlp puts before it.
+        "reason": YT_DLP_PREFIX.sub("", reason.strip(), count=1)[-2000:],
         "known": known,
         "temporary": temporary,
         "retry_after": retry_after,

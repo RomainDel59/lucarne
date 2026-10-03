@@ -97,6 +97,10 @@ class Repository:
         """Return the language YouTube titles and descriptions are fetched in; English until one is set."""
         return str(self.instance_settings()["metadata_language"] or "en")
 
+    def show_skipped_videos(self) -> bool:
+        """Whether the videos that could not be read are shown in the lists; they are hidden until an administrator says so."""
+        return bool(self.instance_settings()["show_skipped_videos"])
+
     def has_metadata_language(self) -> bool:
         return self.instance_settings()["metadata_language"] is not None
 
@@ -117,6 +121,8 @@ class Repository:
         language = values.get("metadata_language") or current["metadata_language"]
         if language is not None and language not in SUPPORTED_LANGUAGES:
             raise ValueError("The YouTube metadata language is not supported.")
+        show_skipped = values.get("show_skipped_videos")
+        show_skipped = bool(current["show_skipped_videos"]) if show_skipped is None else bool(show_skipped)
         batch_size = int(values.get("batch_size", 10))
         lot_wait = int(values.get("lot_wait_seconds", 300))
         duration = int(values.get("campaign_duration_seconds", 7200))
@@ -133,8 +139,8 @@ class Repository:
             connection.execute(
                 """UPDATE instance_settings SET batch_size = ?, lot_wait_seconds = ?,
                    campaign_duration_seconds = ?, temporary_retention_days = ?, metadata_language = ?,
-                   updated_at = ? WHERE singleton = 1""",
-                (batch_size, lot_wait, duration, retention, language, now()),
+                   show_skipped_videos = ?, updated_at = ? WHERE singleton = 1""",
+                (batch_size, lot_wait, duration, retention, language, int(show_skipped), now()),
             )
         return self.instance_settings()
 
@@ -336,7 +342,9 @@ class Repository:
         page_size: int = 10,
     ) -> dict[str, Any]:
         page = max(1, page)
-        conditions = ["v.user_id=?", "v.deleting=0", "v.availability!='skipped'"]
+        conditions = ["v.user_id=?", "v.deleting=0"]
+        if not self.show_skipped_videos():
+            conditions.append("v.availability!='skipped'")
         parameters: list[Any] = [user_id]
         joins = ""
         if channel_id is not None:
@@ -489,6 +497,17 @@ class Repository:
                     ),
                 )
         return self.video_by_youtube_id(user_id, youtube_id)
+
+    def request_video_retry(self, user_id: str, video_id: int) -> dict[str, Any]:
+        """Ask for a new try of a video that could not be read, ahead of the others; its attempts start again."""
+        video = self.video(user_id, video_id)
+        if video["availability"] != "skipped":
+            raise ConflictError("Only a video that could not be read can be tried again.")
+        with self.db.write() as connection:
+            connection.execute(
+                "UPDATE videos SET skip_attempts=0,retry_at=NULL,updated_at=? WHERE id=?", (now(), video_id)
+            )
+        return self.enqueue(user_id, "retry_videos", None, None, {"youtube_ids": [video["youtube_id"]]}, True)
 
     def due_retries(self, user_id: str, limit: int) -> list[dict[str, Any]]:
         """Videos that could not be read and whose time to try again has come, the earliest first."""
