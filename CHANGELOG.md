@@ -2,6 +2,13 @@
 
 All notable changes to Lucarne are documented in this file.
 
+## 1.3.1
+
+- Read the reason of every YouTube failure in English, whatever the language chosen for titles, so private, removed, members-only, age-restricted and not yet released videos are recognized the same way.
+- Keep a hidden record of the videos that could not be read, with the reason given by YouTube, instead of failing the whole batch and repeating the same error. Videos that are not yet released are tried again at their release date, and the others at spaced intervals for a week.
+- Add an administration option to show these videos, flagged as skipped, in the lists. Their page gives the reason and a Retry button, and the date falls back to the day they were found, with a tooltip.
+- Upgrading from 1.3.0 migrates the database automatically (schema version 6).
+
 ## 1.3.0
 
 - Drag a subscription from the Subscriptions page onto a catalogue of the navigation to add it, without leaving its other catalogues. A notification tells when the channel is added, or that it is already there.
