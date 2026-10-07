@@ -14,6 +14,12 @@
 					</template>
 					{{ t('Settings') }}
 				</NcButton>
+				<NcButton v-if="data.video.availability === 'skipped'" variant="secondary" @click="retryVideo">
+					<template #icon>
+						<RefreshIcon :size="20" />
+					</template>
+					{{ t('Retry') }}
+				</NcButton>
 				<NcButton variant="error" @click="deleteVideo">
 					<template #icon>
 						<DeleteIcon :size="20" />
@@ -84,7 +90,7 @@
 						:to="data.video.channel_id ? { name: 'channel', params: { id: data.video.channel_id } } : undefined">
 						{{ data.video.channel_name || t('Standalone video') }}
 					</NcButton>
-					<span>{{ `${formatDate(data.video.published_at)}${data.video.duration ? ` · ${formatDuration(data.video.duration)}` : ''}` }}</span>
+					<span :title="dateHint">{{ `${formatDate(data.video.published_at || data.video.created_at)}${data.video.duration ? ` · ${formatDuration(data.video.duration)}` : ''}` }}</span>
 					<NcCheckboxRadioSwitch type="switch" :model-value="retained" @update:model-value="setRetention">
 						{{ t('Keep offline') }}
 					</NcCheckboxRadioSwitch>
@@ -123,6 +129,7 @@ import ArrowLeftIcon from 'vue-material-design-icons/ArrowLeft.vue'
 import CogIcon from 'vue-material-design-icons/Cog.vue'
 import DeleteIcon from 'vue-material-design-icons/Delete.vue'
 import PlayIcon from 'vue-material-design-icons/Play.vue'
+import RefreshIcon from 'vue-material-design-icons/Refresh.vue'
 import VideoOutlineIcon from 'vue-material-design-icons/VideoOutline.vue'
 import { apiUrl, request, send } from '../api.js'
 import PageHeader from '../components/PageHeader.vue'
@@ -164,6 +171,12 @@ const { data, loading, error, reload } = useAsync(async () => {
 }, () => [route.name, route.params.id])
 
 const thumbnail = computed(() => (data.value?.video.thumbnail_url ? apiUrl(data.value.video.thumbnail_url) : ''))
+// Without a publication date the date of the video is the one it was added in Lucarne; say so for a video that was never readable.
+const dateHint = computed(() => (
+	data.value?.video.availability === 'skipped' && !data.value.video.published_at
+		? t('Date added in Lucarne: the publication date is not known')
+		: undefined
+))
 const unavailable = computed(() => Boolean(data.value) && data.value.video.availability !== 'available' && !data.value.video.media_available)
 
 watch(data, (value) => {
@@ -295,6 +308,15 @@ async function setRetention(value) {
 		notify(value ? t('The next download will be retained.') : t('The retained media was deleted.'))
 	} catch (failure) {
 		retained.value = previous
+		notifyError(failure)
+	}
+}
+
+async function retryVideo() {
+	try {
+		await send('POST', `api/videos/${data.value.video.id}/retry`)
+		notify(t('A new try is queued'))
+	} catch (failure) {
 		notifyError(failure)
 	}
 }

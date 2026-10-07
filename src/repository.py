@@ -12,6 +12,7 @@ from urllib.parse import quote, urlsplit
 from .database import Database, placeholders
 from .errors import ConflictError, NotFoundError
 from .localization import SUPPORTED_LANGUAGES
+from .skipped import schedule
 
 
 def now() -> int:
@@ -96,6 +97,10 @@ class Repository:
         """Return the language YouTube titles and descriptions are fetched in; English until one is set."""
         return str(self.instance_settings()["metadata_language"] or "en")
 
+    def show_skipped_videos(self) -> bool:
+        """Whether the videos that could not be read are shown in the lists; they are hidden until an administrator says so."""
+        return bool(self.instance_settings()["show_skipped_videos"])
+
     def has_metadata_language(self) -> bool:
         return self.instance_settings()["metadata_language"] is not None
 
@@ -116,6 +121,8 @@ class Repository:
         language = values.get("metadata_language") or current["metadata_language"]
         if language is not None and language not in SUPPORTED_LANGUAGES:
             raise ValueError("The YouTube metadata language is not supported.")
+        show_skipped = values.get("show_skipped_videos")
+        show_skipped = bool(current["show_skipped_videos"]) if show_skipped is None else bool(show_skipped)
         batch_size = int(values.get("batch_size", 10))
         lot_wait = int(values.get("lot_wait_seconds", 300))
         duration = int(values.get("campaign_duration_seconds", 7200))
@@ -132,8 +139,8 @@ class Repository:
             connection.execute(
                 """UPDATE instance_settings SET batch_size = ?, lot_wait_seconds = ?,
                    campaign_duration_seconds = ?, temporary_retention_days = ?, metadata_language = ?,
-                   updated_at = ? WHERE singleton = 1""",
-                (batch_size, lot_wait, duration, retention, language, now()),
+                   show_skipped_videos = ?, updated_at = ? WHERE singleton = 1""",
+                (batch_size, lot_wait, duration, retention, language, int(show_skipped), now()),
             )
         return self.instance_settings()
 
@@ -180,6 +187,7 @@ class Repository:
         return self.db.all(
             f"""SELECT c.*, COUNT(v.id) AS video_count, MAX(v.published_at) AS latest_published_at
                 FROM channels c LEFT JOIN videos v ON v.channel_id=c.id AND v.user_id=c.user_id
+                     AND v.availability!='skipped'
                 WHERE {condition} GROUP BY c.id ORDER BY c.title COLLATE NOCASE, c.id""",
             tuple(parameters),
         )
@@ -251,11 +259,12 @@ class Repository:
 
     def playlists(self, user_id: str) -> list[dict[str, Any]]:
         return self.db.all(
-            """SELECT p.*, COUNT(pv.video_id) AS video_count, MAX(v.published_at) AS latest_published_at,
+            """SELECT p.*, COUNT(v.id) AS video_count, MAX(v.published_at) AS latest_published_at,
                       (SELECT v2.thumbnail_file FROM playlist_videos pv2 JOIN videos v2 ON v2.id=pv2.video_id
-                       WHERE pv2.playlist_id=p.id ORDER BY pv2.position, pv2.added_at, pv2.video_id LIMIT 1) AS cover_file
+                       WHERE pv2.playlist_id=p.id AND v2.availability!='skipped'
+                       ORDER BY pv2.position, pv2.added_at, pv2.video_id LIMIT 1) AS cover_file
                FROM playlists p LEFT JOIN playlist_videos pv ON pv.playlist_id=p.id
-               LEFT JOIN videos v ON v.id=pv.video_id
+               LEFT JOIN videos v ON v.id=pv.video_id AND v.availability!='skipped'
                WHERE p.user_id=? AND p.deleting=0 GROUP BY p.id ORDER BY p.title COLLATE NOCASE, p.id""",
             (user_id,),
         )
@@ -334,6 +343,8 @@ class Repository:
     ) -> dict[str, Any]:
         page = max(1, page)
         conditions = ["v.user_id=?", "v.deleting=0"]
+        if not self.show_skipped_videos():
+            conditions.append("v.availability!='skipped'")
         parameters: list[Any] = [user_id]
         joins = ""
         if channel_id is not None:
@@ -360,7 +371,12 @@ class Repository:
             f"SELECT COUNT(DISTINCT v.id) AS count FROM videos v{joins} WHERE {where}", tuple(parameters)
         )
         # A playlist keeps its own order, never the publication date.
-        order = "pv.position, pv.added_at, v.id" if playlist_id is not None else "v.published_at DESC, v.id DESC"
+        # Without a publication date, a video is placed by the date it was added.
+        order = (
+            "pv.position, pv.added_at, v.id"
+            if playlist_id is not None
+            else "COALESCE(NULLIF(v.published_at,0), v.created_at) DESC, v.id DESC"
+        )
         offset = (page - 1) * page_size
         pending_on_page = max(0, min(page_size, pending_count - offset))
         video_limit = page_size - pending_on_page
@@ -417,6 +433,90 @@ class Repository:
     def video_by_youtube_id(self, user_id: str, youtube_id: str) -> dict[str, Any] | None:
         return self.db.one("SELECT * FROM videos WHERE user_id=? AND youtube_id=?", (user_id, youtube_id))
 
+    def record_unreadable_video(
+        self,
+        user_id: str,
+        failure: dict[str, Any],
+        channel_id: int | None = None,
+        channel_name: str = "",
+        published_at: int = 0,
+    ) -> dict[str, Any] | None:
+        """Keep a trace of a video that YouTube could not give, instead of losing it or failing the batch.
+
+        A video never read becomes a hidden row (availability `skipped`) with the reason given by YouTube. A video
+        already in the library is only marked unavailable when the cause is known: an unknown failure says nothing
+        about it. The row carries the time of the next try, if any (see `skipped.schedule`).
+        """
+        youtube_id = str(failure["id"])
+        timestamp = now()
+        existing = self.video_by_youtube_id(user_id, youtube_id)
+        if existing and existing["deleting"]:
+            return None
+        if existing and existing["availability"] != "skipped":
+            if not failure["known"]:
+                return None
+            with self.db.write() as connection:
+                connection.execute(
+                    "UPDATE videos SET availability='unavailable',unavailable_reason=?,availability_checked_at=?,updated_at=? WHERE id=?",
+                    (failure["reason"], timestamp, timestamp, existing["id"]),
+                )
+            return self.video_by_youtube_id(user_id, youtube_id)
+        attempts, retry_at = schedule(
+            failure,
+            int(existing["skip_attempts"]) if existing else 0,
+            int(existing["created_at"]) if existing else timestamp,
+            timestamp,
+        )
+        with self.db.write() as connection:
+            if existing:
+                connection.execute(
+                    """UPDATE videos SET unavailable_reason=?,availability_checked_at=?,skip_attempts=?,retry_at=?,
+                       channel_id=COALESCE(channel_id,?),updated_at=? WHERE id=?""",
+                    (failure["reason"], timestamp, attempts, retry_at, channel_id, timestamp, existing["id"]),
+                )
+            else:
+                connection.execute(
+                    """INSERT INTO videos(user_id,youtube_id,webpage_url,title,channel_id,channel_name,published_at,
+                                          availability,unavailable_reason,availability_checked_at,skip_attempts,
+                                          retry_at,created_at,updated_at)
+                       VALUES (?,?,?,?,?,?,?,'skipped',?,?,?,?,?,?)""",
+                    (
+                        user_id,
+                        youtube_id,
+                        f"https://www.youtube.com/watch?v={youtube_id}",
+                        youtube_id,
+                        channel_id,
+                        channel_name,
+                        published_at,
+                        failure["reason"],
+                        timestamp,
+                        attempts,
+                        retry_at,
+                        timestamp,
+                        timestamp,
+                    ),
+                )
+        return self.video_by_youtube_id(user_id, youtube_id)
+
+    def request_video_retry(self, user_id: str, video_id: int) -> dict[str, Any]:
+        """Ask for a new try of a video that could not be read, ahead of the others; its attempts start again."""
+        video = self.video(user_id, video_id)
+        if video["availability"] != "skipped":
+            raise ConflictError("Only a video that could not be read can be tried again.")
+        with self.db.write() as connection:
+            connection.execute(
+                "UPDATE videos SET skip_attempts=0,retry_at=NULL,updated_at=? WHERE id=?", (now(), video_id)
+            )
+        return self.enqueue(user_id, "retry_videos", None, None, {"youtube_ids": [video["youtube_id"]]}, True)
+
+    def due_retries(self, user_id: str, limit: int) -> list[dict[str, Any]]:
+        """Videos that could not be read and whose time to try again has come, the earliest first."""
+        return self.db.all(
+            """SELECT * FROM videos WHERE user_id=? AND availability='skipped' AND deleting=0
+               AND retry_at IS NOT NULL AND retry_at<=? ORDER BY retry_at,id LIMIT ?""",
+            (user_id, now(), limit),
+        )
+
     def store_video(self, user_id: str, metadata: dict[str, Any], channel_id: int | None = None) -> dict[str, Any]:
         youtube_id = str(metadata.get("id", ""))
         if not youtube_id:
@@ -449,7 +549,8 @@ class Repository:
                      title=excluded.title,description=excluded.description,
                      channel_id=COALESCE(excluded.channel_id,videos.channel_id),channel_name=excluded.channel_name,
                      published_at=excluded.published_at,duration=excluded.duration,availability='available',
-                     unavailable_reason=NULL,availability_checked_at=excluded.updated_at,deleting=0,updated_at=excluded.updated_at""",
+                     unavailable_reason=NULL,availability_checked_at=excluded.updated_at,skip_attempts=0,retry_at=NULL,
+                     deleting=0,updated_at=excluded.updated_at""",
                 (
                     user_id,
                     youtube_id,
@@ -647,14 +748,15 @@ class Repository:
         page = max(1, page)
         total = self.db.one(
             """SELECT COUNT(*) AS count FROM histories h JOIN videos v ON v.id=h.video_id AND v.user_id=h.user_id
-               WHERE h.user_id=? AND v.deleting=0""",
+               WHERE h.user_id=? AND v.deleting=0 AND v.availability!='skipped'""",
             (user_id,),
         )
         items = self.db.all(
             """SELECT v.*,h.position AS history_position,h.duration AS history_duration,h.completed AS history_completed,
                       h.updated_at AS history_updated_at
                FROM histories h JOIN videos v ON v.id=h.video_id AND v.user_id=h.user_id
-               WHERE h.user_id=? AND v.deleting=0 ORDER BY h.updated_at DESC LIMIT ? OFFSET ?""",
+               WHERE h.user_id=? AND v.deleting=0 AND v.availability!='skipped'
+               ORDER BY h.updated_at DESC LIMIT ? OFFSET ?""",
             (user_id, page_size, (page - 1) * page_size),
         )
         return {"items": items, "page": page, "page_size": page_size, "total": int((total or {}).get("count", 0))}
@@ -799,6 +901,15 @@ class Repository:
                 "summary": "Channels and playlists to query",
                 "details": details,
             }
+        if job_type == "retry_videos":
+            ids = [str(value) for value in payload.get("youtube_ids", [])]
+            count = len(ids)
+            return {
+                "title": "Try again {count} unreadable video" if count == 1 else "Try again {count} unreadable videos",
+                "variables": {"count": count},
+                "summary": "Videos that YouTube could not provide earlier",
+                "details": [f"video {value}" for value in ids],
+            }
         if job_type == "metadata":
             ids = [int(value) for value in payload.get("candidate_ids", [])]
             details = []
@@ -870,11 +981,13 @@ class Repository:
     def _source_video_count(self, user_id: str, source_type: str, source_id: int) -> int:
         if source_type == "channel":
             row = self.db.one(
-                "SELECT COUNT(*) AS count FROM videos WHERE user_id=? AND channel_id=?", (user_id, source_id)
+                "SELECT COUNT(*) AS count FROM videos WHERE user_id=? AND channel_id=? AND availability!='skipped'",
+                (user_id, source_id),
             )
         else:
             row = self.db.one(
-                "SELECT COUNT(*) AS count FROM playlist_videos pv JOIN playlists p ON p.id=pv.playlist_id WHERE p.user_id=? AND p.id=?",
+                """SELECT COUNT(*) AS count FROM playlist_videos pv JOIN playlists p ON p.id=pv.playlist_id
+                   JOIN videos v ON v.id=pv.video_id WHERE p.user_id=? AND p.id=? AND v.availability!='skipped'""",
                 (user_id, source_id),
             )
         return int((row or {}).get("count") or 0)

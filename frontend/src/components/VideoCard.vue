@@ -16,11 +16,11 @@
 				<VideoOutlineIcon v-else :size="48" />
 				<span v-if="video.duration" class="lucarne-video-card__duration">{{ formatDuration(video.duration) }}</span>
 				<NcChip
-					v-if="unavailable"
+					v-if="flag"
 					class="lucarne-video-card__unavailable"
-					variant="error"
+					:variant="flag.variant"
 					no-close
-					:text="t('Unavailable')" />
+					:text="flag.text" />
 				<span v-if="progress > 0" class="lucarne-video-card__progress" :style="{ width: `${progress}%` }" />
 			</div>
 			<div class="lucarne-video-card__body">
@@ -28,7 +28,7 @@
 				<span class="lucarne-video-card__meta">
 						<span v-if="channelName" class="lucarne-video-card__channel" :title="channelName">{{ channelName }}</span>
 						<span v-if="channelName" aria-hidden="true">·</span>
-						<span class="lucarne-video-card__date">{{ date }}</span>
+						<span class="lucarne-video-card__date" :title="dateHint">{{ date }}</span>
 					</span>
 			</div>
 		</component>
@@ -85,9 +85,21 @@ function dropOnCard(event) {
 }
 
 const thumbnail = computed(() => (props.video.thumbnail_url ? apiUrl(props.video.thumbnail_url) : ''))
-const unavailable = computed(() => props.video.availability && props.video.availability !== 'available')
+// A video that was never readable is flagged apart from one that was and no longer is.
+const flag = computed(() => {
+	if (props.video.availability === 'skipped') {
+		return { variant: 'warning', text: t('Skipped') }
+	}
+	return props.video.availability && props.video.availability !== 'available' ? { variant: 'error', text: t('Unavailable') } : null
+})
 const title = computed(() => props.video.title || t('Pending video'))
 const channelName = computed(() => (props.pending ? '' : props.video.channel_name || t('Standalone video')))
+// Without a publication date the date is the one the video was added in Lucarne; say so for a video that was never readable.
+const dateHint = computed(() => (
+	props.video.availability === 'skipped' && !props.video.published_at
+		? t('Date added in Lucarne: the publication date is not known')
+		: undefined
+))
 const date = computed(() => formatDate(props.video.published_at || props.video.created_at))
 const progress = computed(() => {
 	const duration = Number(props.video.history_duration || 0)

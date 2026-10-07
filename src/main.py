@@ -79,7 +79,7 @@ async def lifespan(app: FastAPI):
     media.stop()
 
 
-APP = FastAPI(title="Lucarne", version="1.3.0", lifespan=lifespan, docs_url=None, redoc_url=None)
+APP = FastAPI(title="Lucarne", version="1.3.1", lifespan=lifespan, docs_url=None, redoc_url=None)
 APP.add_middleware(AppAPIAuthMiddleware)
 for static_directory in ("js", "css", "img"):
     APP.mount(
@@ -297,6 +297,11 @@ async def add_video(payload: UrlPayload, nc: Annotated[AsyncNextcloudApp, Depend
     uid = user_id(nc)
     job = repository.enqueue(uid, "inspect_video", "video", None, {"url": normalize_video_url(payload.url)}, True)
     return {"queued": True, "job": job}
+
+
+@APP.post("/api/videos/{video_id}/retry", status_code=202)
+async def retry_video(video_id: int, nc: Annotated[AsyncNextcloudApp, Depends(anc_app)]) -> dict[str, Any]:
+    return {"queued": True, "job": repository.request_video_retry(user_id(nc), video_id)}
 
 
 @APP.put("/api/videos/{video_id}")
@@ -561,10 +566,18 @@ async def delete_job(job_id: int, nc: Annotated[AsyncNextcloudApp, Depends(anc_a
     return {"deleted": True}
 
 
+def administrator_view() -> dict[str, Any]:
+    """The settings whose value shown to the administrator is not the raw column."""
+    return {
+        "metadata_language": repository.metadata_language(),
+        "show_skipped_videos": repository.show_skipped_videos(),
+    }
+
+
 @APP.get("/api/admin/settings")
 async def get_admin_settings(nc: Annotated[AsyncNextcloudApp, Depends(anc_app)]) -> dict[str, Any]:
     await require_admin(nc)
-    return {**repository.instance_settings(), "metadata_language": repository.metadata_language()}
+    return {**repository.instance_settings(), **administrator_view()}
 
 
 @APP.put("/api/admin/settings")
@@ -574,7 +587,7 @@ async def update_admin_settings(
     await require_admin(nc)
     repository.update_instance_settings(payload.model_dump())
     repository.apply_instance_settings()
-    return {**repository.instance_settings(), "metadata_language": repository.metadata_language()}
+    return {**repository.instance_settings(), **administrator_view()}
 
 
 def asset_path(kind: str, uid: str, identifier: int) -> Path:
@@ -590,7 +603,8 @@ def asset_path(kind: str, uid: str, identifier: int) -> Path:
             return settings.playlist_images / str(row["image_file"])
         first = database.one(
             """SELECT v.thumbnail_file FROM playlist_videos pv JOIN videos v ON v.id=pv.video_id
-               WHERE pv.playlist_id=? AND v.user_id=? ORDER BY pv.position,pv.added_at LIMIT 1""",
+               WHERE pv.playlist_id=? AND v.user_id=? AND v.availability!='skipped'
+               ORDER BY pv.position,pv.added_at LIMIT 1""",
             (identifier, uid),
         )
         return settings.thumbnails / str((first or {}).get("thumbnail_file") or "")

@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 6
 
 
 SCHEMA = """
@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS instance_settings (
     campaign_duration_seconds INTEGER NOT NULL DEFAULT 7200,
     temporary_retention_days INTEGER NOT NULL DEFAULT 7,
     metadata_language TEXT,
+    show_skipped_videos INTEGER NOT NULL DEFAULT 0,
     updated_at INTEGER NOT NULL
 );
 
@@ -117,6 +118,8 @@ CREATE TABLE IF NOT EXISTS videos (
     availability TEXT NOT NULL DEFAULT 'available',
     unavailable_reason TEXT,
     availability_checked_at INTEGER,
+    skip_attempts INTEGER NOT NULL DEFAULT 0,
+    retry_at INTEGER,
     retained INTEGER NOT NULL DEFAULT 0,
     deleting INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL,
@@ -246,6 +249,13 @@ class Database:
                 if version == 3:
                     connection.execute("ALTER TABLE candidates ADD COLUMN source_rank INTEGER")
                     version = 4
+                if version == 4:
+                    connection.execute("ALTER TABLE videos ADD COLUMN skip_attempts INTEGER NOT NULL DEFAULT 0")
+                    connection.execute("ALTER TABLE videos ADD COLUMN retry_at INTEGER")
+                    version = 5
+                if version == 5:
+                    connection.execute("ALTER TABLE instance_settings ADD COLUMN show_skipped_videos INTEGER NOT NULL DEFAULT 0")
+                    version = 6
                 if version != SCHEMA_VERSION:
                     raise RuntimeError(f"Unsupported database schema version: {row['version']}")
                 if int(row["version"]) != SCHEMA_VERSION:
