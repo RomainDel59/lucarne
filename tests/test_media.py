@@ -128,3 +128,39 @@ def test_interrupted_downloads_are_failed_on_restart(tmp_path: Path, database, r
 
     assert media.recover_interrupted() == 1
     assert media.download("alice", "interrupted")["status"] == "error"
+
+
+def insert_failed_download(database, video_id: int, accessed_at: int) -> None:
+    with database.write() as connection:
+        connection.execute(
+            """INSERT INTO downloads(id,user_id,video_id,mode,quality,audio_quality,status,error,created_at,accessed_at,updated_at)
+               VALUES ('failed','alice',?,'video','720','128','error','boom',?,?,?)""",
+            (video_id, accessed_at, accessed_at, accessed_at),
+        )
+
+
+def test_deleting_video_files_ignores_a_failed_download(tmp_path: Path, database, repository: Repository) -> None:
+    video = store_video(repository)
+    media = make_media(tmp_path, database, repository)
+    insert_failed_download(database, video["id"], now())
+    cached = insert_cached_download(database, media.config.downloads, video["id"])
+
+    media.delete_video_files("alice", video["id"])
+
+    assert not (media.config.downloads / f"{cached}.mp4").exists()
+    assert media.config.downloads.is_dir()
+
+
+def test_cleanup_purges_an_expired_failed_download(tmp_path: Path, database, repository: Repository) -> None:
+    video = store_video(repository)
+    media = make_media(tmp_path, database, repository)
+    insert_failed_download(database, video["id"], 1)
+    cached = insert_cached_download(database, media.config.downloads, video["id"])
+    with database.write() as connection:
+        connection.execute("UPDATE downloads SET accessed_at=1 WHERE id=?", (cached,))
+
+    media.cleanup()
+
+    assert database.all("SELECT id FROM downloads") == []
+    assert not (media.config.downloads / f"{cached}.mp4").exists()
+    assert media.config.downloads.is_dir()

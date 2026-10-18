@@ -191,6 +191,14 @@ class MediaService:
         base = self.config.library if download.get("retained") else self.config.downloads
         return base / str(download.get("file_name") or "")
 
+    def remove_file(self, download: dict[str, Any]) -> None:
+        # A failed download has no file name, and its path would be the base directory itself.
+        if not download.get("file_name"):
+            return
+        path = self.path_for(download)
+        if path.is_file():
+            path.unlink(missing_ok=True)
+
     def retain(self, user_id: str, video_id: int, retained: bool, download_id: str | None = None) -> dict[str, Any]:
         self.repository.video(user_id, video_id)
         if retained:
@@ -243,13 +251,13 @@ class MediaService:
                 )
                 connection.execute("UPDATE videos SET retained=1,updated_at=? WHERE id=?", (timestamp, video_id))
             for previous_row in previous:
-                self.path_for(previous_row).unlink(missing_ok=True)
+                self.remove_file(previous_row)
         else:
             rows = self.db.all(
                 "SELECT * FROM downloads WHERE user_id=? AND video_id=? AND retained=1", (user_id, video_id)
             )
             for row in rows:
-                self.path_for(row).unlink(missing_ok=True)
+                self.remove_file(row)
             with self.db.write() as connection:
                 connection.execute(
                     "DELETE FROM downloads WHERE user_id=? AND video_id=? AND retained=1", (user_id, video_id)
@@ -265,7 +273,7 @@ class MediaService:
             (threshold,),
         )
         for row in rows:
-            self.path_for(row).unlink(missing_ok=True)
+            self.remove_file(row)
         if rows:
             ids = [row["id"] for row in rows]
             with self.db.write() as connection:
@@ -273,6 +281,6 @@ class MediaService:
 
     def delete_video_files(self, user_id: str, video_id: int) -> None:
         for row in self.db.all("SELECT * FROM downloads WHERE user_id=? AND video_id=?", (user_id, video_id)):
-            self.path_for(row).unlink(missing_ok=True)
+            self.remove_file(row)
         for file in self.config.thumbnails.glob(f"{owner_key(user_id, video_id)}-*"):
             file.unlink(missing_ok=True)
